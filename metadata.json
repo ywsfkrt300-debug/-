@@ -1,0 +1,7 @@
+{
+  "name": "صوّرني (Sawwirni)",
+  "description": "أداة ذكية للمدارس لتصوير الطلاب وإدارة صورهم بسهولة وكفاءة، مع تخزين محلي للبيانات.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
