@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { SchoolClass } from '../types';
 import { db } from '../db';
 import Modal from './Modal';
-import { PlusIcon, SpinnerIcon } from './icons';
+import { PlusIcon, SpinnerIcon, TrashIcon } from './icons';
 
 interface ClassManagerProps {
   onClassSelect: (schoolClass: SchoolClass) => void;
@@ -14,14 +14,22 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
   const [newClassName, setNewClassName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<SchoolClass | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadClasses = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await db.getClasses();
-      setClasses(data);
+      const basicClasses = await db.getClasses();
+      const classesWithCounts = await Promise.all(
+        basicClasses.map(async (schoolClass) => {
+          const studentCount = await db.getStudentCountByClass(schoolClass.id);
+          return { ...schoolClass, studentCount };
+        })
+      );
+      setClasses(classesWithCounts);
     } catch (error) {
-      console.error("Failed to load classes:", error);
+      console.error("Failed to load classes or student counts:", error);
     } finally {
       setIsLoading(false);
     }
@@ -36,9 +44,9 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
       setIsSaving(true);
       try {
         await db.addClass(newClassName.trim());
+        await loadClasses();
         setNewClassName('');
         setIsModalOpen(false);
-        await loadClasses();
       } catch (error) {
         console.error("Failed to add class:", error);
       } finally {
@@ -46,6 +54,27 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
       }
     }
   };
+
+  const handleOpenDeleteModal = (schoolClass: SchoolClass) => {
+    setClassToDelete(schoolClass);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (classToDelete) {
+      setIsDeleting(true);
+      try {
+        await db.deleteClass(classToDelete.id);
+        await loadClasses();
+        setClassToDelete(null);
+      } catch (error) {
+        console.error("Failed to delete class:", error);
+        alert('حدث خطأ أثناء حذف الشُعبة.');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -75,16 +104,32 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
           {classes.map((c) => (
             <div
               key={c.id}
-              onClick={() => onClassSelect(c)}
-              className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-xl hover:scale-105 hover:bg-white/80 dark:hover:bg-gray-900/80 transition-all duration-300 cursor-pointer p-6 flex items-center justify-center"
+              className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-xl hover:scale-105 hover:bg-white/80 dark:hover:bg-gray-900/80 transition-all duration-300 group"
             >
-              <h3 className="text-xl font-semibold text-center text-gray-700 dark:text-gray-200">{c.name}</h3>
+              <div onClick={() => onClassSelect(c)} className="cursor-pointer p-6 flex items-center justify-center">
+                <h3 className="text-xl font-semibold text-center text-gray-700 dark:text-gray-200">{c.name}</h3>
+              </div>
+              {c.studentCount !== undefined && (
+                <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow pointer-events-none">
+                  {c.studentCount} طالب
+                </div>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteModal(c);
+                }}
+                className="absolute top-2 left-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                aria-label={`حذف شُعبة ${c.name}`}
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
             </div>
           ))}
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="إضافة شُعبة جديدة">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="إضافة شُعبة جديدة" isLoading={isSaving}>
         <div className="space-y-4">
           <input
             type="text"
@@ -103,6 +148,36 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
             <span>{isSaving ? 'جاري الحفظ...' : 'حفظ'}</span>
           </button>
         </div>
+      </Modal>
+
+      <Modal isOpen={!!classToDelete} onClose={() => setClassToDelete(null)} title="تأكيد حذف الشُعبة" isLoading={isDeleting}>
+        {classToDelete && (
+            <div className="space-y-6">
+            <p className="text-lg text-gray-700 dark:text-gray-300">
+                هل أنت متأكد من حذف شُعبة <span className="font-bold text-red-600 dark:text-red-400">{classToDelete.name}</span>؟
+            </p>
+            <p className="font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 p-3 rounded-md">
+                سيتم حذف جميع الطلاب المسجلين في هذه الشُعبة بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
+            </p>
+            <div className="flex justify-end gap-4">
+                <button 
+                    onClick={() => setClassToDelete(null)}
+                    disabled={isDeleting}
+                    className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+                >
+                    إلغاء
+                </button>
+                <button 
+                    onClick={handleConfirmDelete}
+                    disabled={isDeleting}
+                    className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[110px]"
+                >
+                    {isDeleting && <SpinnerIcon className="w-5 h-5"/>}
+                    <span>{isDeleting ? 'جاري الحذف...' : 'نعم، احذف'}</span>
+                </button>
+            </div>
+            </div>
+        )}
       </Modal>
     </div>
   );

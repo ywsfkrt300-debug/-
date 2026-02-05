@@ -13,7 +13,8 @@ const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-teal-600 dark:text-teal-400">صوّرني</h1>
+            <img src="https://image2url.com/r2/default/images/1770324189688-19e18e06-e522-42b7-b936-30cf78ff88c2.png" alt="شعار صوّرني" className="h-10 w-auto" />
+            <h1 className="text-2xl font-bold text-teal-600 dark:text-teal-400 mr-3">صوّرني</h1>
             {className && (
               <>
                 <span className="mx-2 text-gray-300 dark:text-gray-600">/</span>

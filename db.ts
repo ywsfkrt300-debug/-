@@ -1,4 +1,3 @@
-
 import type { SchoolClass, Student } from './types';
 
 const DB_NAME = 'SawwirniDB';
@@ -49,6 +48,32 @@ class Database {
     });
   }
 
+  async deleteClass(classId: number): Promise<void> {
+    const db = await this.db;
+    const tx = db.transaction([CLASSES_STORE, STUDENTS_STORE], 'readwrite');
+    const classesStore = tx.objectStore(CLASSES_STORE);
+    const studentsStore = tx.objectStore(STUDENTS_STORE);
+    const studentsIndex = studentsStore.index('classId');
+
+    // 1. Delete the class itself
+    classesStore.delete(classId);
+
+    // 2. Find and delete all students in that class
+    const getStudentsRequest = studentsIndex.openCursor(IDBKeyRange.only(classId));
+    getStudentsRequest.onsuccess = () => {
+        const cursor = getStudentsRequest.result;
+        if (cursor) {
+            studentsStore.delete(cursor.primaryKey);
+            cursor.continue();
+        }
+    };
+
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+  }
+
   // Student Methods
   async addStudent(name: string, classId: number): Promise<void> {
     const store = await this.getStore(STUDENTS_STORE, 'readwrite');
@@ -62,6 +87,16 @@ class Database {
       const request = index.getAll(classId);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
+    });
+  }
+
+  async getStudentCountByClass(classId: number): Promise<number> {
+    const store = await this.getStore(STUDENTS_STORE, 'readonly');
+    const index = store.index('classId');
+    return new Promise((resolve, reject) => {
+        const request = index.count(classId);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
     });
   }
 

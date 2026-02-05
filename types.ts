@@ -1,7 +1,7 @@
-
 export interface SchoolClass {
   id: number;
   name: string;
+  studentCount?: number;
 }
 
 export interface Student {

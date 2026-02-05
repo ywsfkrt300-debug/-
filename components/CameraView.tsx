@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Student } from '../types';
 import { SpinnerIcon, SwitchCameraIcon } from './icons';
 import { analyzeStudentPhoto, removeBackgroundImage } from '../utils/geminiUtils';
+import { removeBackgroundOffline } from '../utils/backgroundRemover';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import CropModal from './CropModal';
 
 interface CameraViewProps {
@@ -23,6 +25,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   const [analysisFeedback, setAnalysisFeedback] = useState<string | null>(null);
   const [tilt, setTilt] = useState(0);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const isOnline = useOnlineStatus();
 
   const startCamera = useCallback(async (mode: 'user' | 'environment') => {
       if (stream) {
@@ -79,24 +82,46 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
     setOriginalImage(null);
     setCapturedImage(croppedImageDataUrl);
     setAnalysisFeedback(null);
-    setIsAnalyzing(true);
-    try {
-      const analysis = await analyzeStudentPhoto(croppedImageDataUrl);
-      setIsAnalyzing(false);
-      if (!analysis.isGood) {
-        setAnalysisFeedback(analysis.feedback);
-        return;
+    
+    if (isOnline) {
+      setIsAnalyzing(true);
+      try {
+        const analysis = await analyzeStudentPhoto(croppedImageDataUrl);
+        setIsAnalyzing(false);
+        if (!analysis.isGood) {
+          setAnalysisFeedback(analysis.feedback);
+          return;
+        }
+        setAnalysisFeedback('الصورة ممتازة! جاري إزالة الخلفية...');
+        setIsProcessing(true);
+        const processedImage = await removeBackgroundImage(croppedImageDataUrl);
+        setCapturedImage(processedImage);
+        setAnalysisFeedback(null);
+      } catch (error) {
+        console.error("Error during AI processing:", error);
+        setAnalysisFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام المعالج المحلي.');
+        await processOffline(croppedImageDataUrl);
+      } finally {
+        setIsAnalyzing(false);
+        setIsProcessing(false);
       }
-      setAnalysisFeedback('الصورة ممتازة! جاري إزالة الخلفية...');
-      setIsProcessing(true);
-      const processedImage = await removeBackgroundImage(croppedImageDataUrl);
+    } else {
+        await processOffline(croppedImageDataUrl);
+    }
+  };
+
+  const processOffline = async (imageDataUrl: string) => {
+    setAnalysisFeedback('أنت غير متصل بالإنترنت. سيتم إزالة الخلفية محلياً.');
+    setIsProcessing(true);
+    try {
+      const processedImage = await removeBackgroundOffline(imageDataUrl);
       setCapturedImage(processedImage);
       setAnalysisFeedback(null);
     } catch (error) {
-      console.error("Error during AI processing:", error);
-      setAnalysisFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام الصورة الأصلية.');
+      console.error("Error during offline background removal:", error);
+      setCapturedImage(imageDataUrl); // Fallback to original cropped image
+      setAnalysisFeedback('حدث خطأ أثناء المعالجة المحلية، سيتم استخدام الصورة الأصلية.');
     } finally {
-      setIsAnalyzing(false);
       setIsProcessing(false);
     }
   };
@@ -122,6 +147,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center items-center p-4">
       <div className="absolute top-4 right-4 text-white font-bold text-xl sm:text-2xl z-20">{student.name}</div>
       <div className="absolute top-12 right-4 text-white/80 text-sm sm:text-lg z-20 text-center max-w-[90vw]">
+        {!isOnline && <p className="text-yellow-400 font-bold bg-black/50 px-2 py-1 rounded-md mb-2">⚠️ أنت غير متصل بالإنترنت. تم تعطيل فحص الجودة.</p>}
         {!capturedImage && !originalImage && <p>ضع الوجه داخل الإطار وحاذِ العينين مع الخط الأفقي</p>}
         <p className={isLevel ? 'text-green-400' : 'text-yellow-400'}>{isLevel ? 'الجهاز مستقيم' : 'حافظ على استقامة الجهاز'}</p>
       </div>
@@ -134,11 +160,11 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
 
         {!capturedImage && !originalImage && stream && (
           <div className="absolute inset-0 pointer-events-none">
-            <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2/5 h-4/5 text-white/40" viewBox="0 0 150 200" fill="none">
-              <path d="M75 50 C 40 50, 20 70, 20 100 L 20 190 H 130 L 130 100 C 130 70, 110 50, 75 50 Z" stroke="currentColor" strokeWidth="4" strokeDasharray="8 6"/>
-              <circle cx="75" cy="70" r="30" stroke="currentColor" strokeWidth="4" strokeDasharray="8 6" />
-              <line x1="50" y1="70" x2="100" y2="70" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
-              <line x1="75" y1="55" x2="75" y2="100" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+            {/* Passport-style frame overlay for face and shoulders */}
+            <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[34%] h-4/5 text-white/40" viewBox="0 0 300 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="2" width="296" height="396" rx="30" stroke="currentColor" strokeWidth="4" strokeDasharray="10 8"/>
+                {/* Eye line */}
+                <line x1="50" y1="150" x2="250" y2="150" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5"/>
             </svg>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/4 h-1">
               <div className={`absolute w-full h-px top-1/2 ${isLevel ? 'bg-green-500/80' : 'bg-white/50'}`}></div>
@@ -173,7 +199,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
           <button onClick={onClose} className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">إغلاق</button>
           {!capturedImage && !originalImage ? (
             <>
-              <button onClick={handleToggleCamera} className="p-4 bg-gray-700 text-white rounded-full hover:bg-gray-600 transition disabled:bg-gray-500" disabled={!stream} title="تبديل الكاميرا" aria-label="تبديل الكاميرا"><SwitchCameraIcon className="w-6 h-6" /></button>
+              <button onClick={handleToggleCamera} className="p-4 bg-gray-700 text-white rounded-full hover:bg-gray-600 transition disabled:bg-gray-500" title="تبديل الكاميرا" aria-label="تبديل الكاميرا"><SwitchCameraIcon className="w-6 h-6" /></button>
               <button onClick={handleCapture} disabled={!stream} className="px-6 sm:px-8 py-3 sm:py-4 bg-red-600 text-white rounded-full text-lg font-bold hover:bg-red-700 transition disabled:bg-gray-400 flex items-center justify-center min-w-[120px]">التقاط</button>
             </>
           ) : !originalImage ? (
