@@ -28,7 +28,7 @@ const Auth: React.FC = () => {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">مرحباً بك في صوّرني</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-300">
-            سجل الدخول أو أنشئ حساباً جديداً للمتابعة
+            سجل الدخول للمتابعة
         </p>
       </div>
       <form onSubmit={handleLogin} className="mt-8 space-y-6">
