@@ -29,6 +29,8 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
     setIsLoading(true);
     try {
       const data = await db.getStudentsByClass(schoolClass.id);
+      // Sort students alphabetically by name (respecting Arabic characters)
+      data.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
       setStudents(data);
     } catch (error) {
       console.error("Failed to load students:", error);
@@ -154,7 +156,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
           <p className="text-lg text-gray-600 dark:text-gray-300">لم يتم إضافة أي طالب لهذه الشُعبة بعد.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 fade-in">
           {students.map((student) => (
             <div key={student.id} className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-md overflow-hidden group transition-all duration-300 hover:shadow-xl hover:scale-105">
               <div className="relative aspect-[3/4]">

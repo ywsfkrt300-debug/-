@@ -15,6 +15,7 @@ interface CameraViewProps {
 const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const shutterSoundRef = useRef<HTMLAudioElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -52,6 +53,10 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   }, [stream]);
   
   useEffect(() => {
+    // Preload the shutter sound
+    shutterSoundRef.current = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAI V1RYWlhAAAAAAAASW5mbwAAAA8AAABBAAAAAAAAAABoamgAAAAAAP//uQxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AAMIghAABp4Q0AqGgAAABNjb250ZW50X3R5cGUAYmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbQBkYXRhX3NvdXJjZQBzcmVjb3JkZWQ6c291cmNlAG1ldGFkYXRhX2V4cG9ydF92ZXJzaW9uATESAAAAAAAAAAAA//uQxAADASEBCAFqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq-');
+    shutterSoundRef.current.volume = 0.6;
+
     startCamera(facingMode);
     const handleOrientation = (event: DeviceOrientationEvent) => setTilt(event.gamma ?? 0);
     window.addEventListener('deviceorientation', handleOrientation);
@@ -65,6 +70,10 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
+      if (shutterSoundRef.current) {
+        shutterSoundRef.current.currentTime = 0;
+        shutterSoundRef.current.play();
+      }
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;

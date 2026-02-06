@@ -1,13 +1,13 @@
-
 import React from 'react';
-import { BackArrowIcon } from './icons';
+import { BackArrowIcon, CogIcon } from './icons';
 
 interface HeaderProps {
   className?: string;
   onBack?: () => void;
+  onShowSettings: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
+const Header: React.FC<HeaderProps> = ({ className, onBack, onShowSettings }) => {
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 shadow-md sticky top-0 z-10 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,15 +22,25 @@ const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
               </>
             )}
           </div>
-          {onBack && (
+          <div className="flex items-center gap-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center space-i-2 px-3 py-2 border border-transparent text-sm font-medium rounded-md text-teal-700 bg-teal-100 hover:bg-teal-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-teal-300 dark:hover:bg-gray-600 transition"
+              >
+                <BackArrowIcon className="w-5 h-5" />
+                <span>العودة للشُعب</span>
+              </button>
+            )}
             <button
-              onClick={onBack}
-              className="flex items-center space-i-2 px-3 py-2 border border-transparent text-sm font-medium rounded-md text-teal-700 bg-teal-100 hover:bg-teal-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-teal-300 dark:hover:bg-gray-600 transition"
+                onClick={onShowSettings}
+                className="p-2 rounded-full text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 transition"
+                aria-label="إعدادات API"
+                title="إعدادات مفتاح Gemini API"
             >
-              <BackArrowIcon className="w-5 h-5" />
-              <span>العودة للشُعب</span>
+                <CogIcon className="w-6 h-6" />
             </button>
-          )}
+          </div>
         </div>
       </div>
     </header>

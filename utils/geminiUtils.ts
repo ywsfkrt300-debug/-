@@ -1,19 +1,31 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { getApiKey } from './apiKeyManager';
 
 interface AnalysisResult {
     isGood: boolean;
     feedback: string;
 }
 
-// The API key is handled by the execution environment as per instructions.
-// This ensures the key is not exposed in the client-side code.
-const API_KEY = process.env.API_KEY;
-
 let ai: GoogleGenAI | null = null;
-if (API_KEY) {
-    ai = new GoogleGenAI({ apiKey: API_KEY });
-} else {
-    console.error("API_KEY is not set. The photo analysis feature will be disabled.");
+
+function getAiInstance(): GoogleGenAI | null {
+    // If the instance exists, return it
+    if (ai) return ai;
+    
+    // Otherwise, try to create it
+    const apiKey = getApiKey();
+    if (apiKey) {
+        try {
+            ai = new GoogleGenAI({ apiKey });
+            return ai;
+        } catch (error) {
+            console.error("Failed to initialize GoogleGenAI, likely an invalid API key format.", error);
+            return null;
+        }
+    }
+    
+    console.warn("Gemini API key is not set in localStorage. AI features are disabled.");
+    return null;
 }
 
 function dataUrlToGeminiPart(dataUrl: string) {
@@ -34,9 +46,9 @@ function dataUrlToGeminiPart(dataUrl: string) {
 }
 
 export async function analyzeStudentPhoto(imageDataUrl: string): Promise<AnalysisResult> {
-    if (!ai) {
-        console.warn("Skipping photo analysis because API_KEY is not configured.");
-        return { isGood: true, feedback: 'تم تخطي التحليل لعدم وجود مفتاح API.' };
+    const currentAi = getAiInstance();
+    if (!currentAi) {
+        return { isGood: true, feedback: 'تم تخطي التحليل. يرجى إعداد مفتاح API لاستخدام هذه الميزة.' };
     }
     
     try {
@@ -54,7 +66,7 @@ export async function analyzeStudentPhoto(imageDataUrl: string): Promise<Analysi
             تجاوز عن العيوب البسيطة مثل الابتسامة الخفيفة أو الميلان الطفيف.`
         };
 
-        const response = await ai.models.generateContent({
+        const response = await currentAi.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: { parts: [imagePart, textPart] },
             config: {
@@ -62,14 +74,8 @@ export async function analyzeStudentPhoto(imageDataUrl: string): Promise<Analysi
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        isGood: {
-                            type: Type.BOOLEAN,
-                            description: "هل الصورة مقبولة بشكل عام؟"
-                        },
-                        feedback: {
-                            type: Type.STRING,
-                            description: "إذا كانت الصورة غير جيدة، قدم ملاحظة قصيرة وواضحة جداً باللغة العربية. اتركها فارغة إذا كانت جيدة."
-                        }
+                        isGood: { type: Type.BOOLEAN, description: "هل الصورة مقبولة بشكل عام؟" },
+                        feedback: { type: Type.STRING, description: "إذا كانت الصورة غير جيدة، قدم ملاحظة قصيرة وواضحة جداً باللغة العربية. اتركها فارغة إذا كانت جيدة." }
                     },
                     required: ["isGood", "feedback"]
                 },
@@ -85,14 +91,15 @@ export async function analyzeStudentPhoto(imageDataUrl: string): Promise<Analysi
 
     } catch (error) {
         console.error("Error analyzing image with Gemini:", error);
-        return { isGood: true, feedback: 'حدث خطأ أثناء تحليل الصورة، تم التجاوز.' };
+        return { isGood: false, feedback: 'فشل تحليل الصورة. قد يكون مفتاح API غير صالح أو أنك بحاجة لإعداد الفوترة لمشروعك.' };
     }
 }
 
 export async function removeBackgroundImage(imageDataUrl: string): Promise<string> {
-    if (!ai) {
-        console.warn("Skipping background removal because API_KEY is not configured.");
-        return imageDataUrl; // Return original if API is not available
+    const currentAi = getAiInstance();
+    if (!currentAi) {
+        console.warn("Skipping background removal because API key is not set.");
+        return imageDataUrl;
     }
 
     try {
@@ -101,11 +108,9 @@ export async function removeBackgroundImage(imageDataUrl: string): Promise<strin
             text: "Remove the background from this portrait photo and replace it with a solid white background. The subject is a person. The result should be a clean portrait on a white background, suitable for a school ID. Keep the subject intact."
         };
 
-        const response = await ai.models.generateContent({
+        const response = await currentAi.models.generateContent({
             model: 'gemini-2.5-flash-image',
-            contents: {
-                parts: [imagePart, textPart]
-            }
+            contents: { parts: [imagePart, textPart] }
         });
 
         if (response.candidates && response.candidates.length > 0 && response.candidates[0].content.parts) {
