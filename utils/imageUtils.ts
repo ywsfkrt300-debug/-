@@ -1,4 +1,3 @@
-
 import type { Student } from '../types';
 
 /**
@@ -10,6 +9,7 @@ import type { Student } from '../types';
 export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: number; width: number; height: number; }): Promise<string> => {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    image.crossOrigin = "anonymous"; // Important for loading images from Supabase Storage
     image.src = imageSrc;
     image.onload = () => {
       const canvas = document.createElement('canvas');
@@ -39,7 +39,6 @@ export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: numbe
   });
 };
 
-
 /**
  * Adds a name to an image.
  * @param imageDataUrl The base64 data URL of the image.
@@ -49,6 +48,7 @@ export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: numbe
 export const addNameToImage = (imageDataUrl: string, name: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -58,14 +58,12 @@ export const addNameToImage = (imageDataUrl: string, name: string): Promise<stri
 
       ctx.drawImage(img, 0, 0);
 
-      // Text styling
       const fontSize = Math.max(24, Math.round(img.height / 20));
       ctx.font = `bold ${fontSize}px Cairo`;
       ctx.fillStyle = 'white';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       
-      // Text background
       const textPadding = fontSize / 2;
       const textMetrics = ctx.measureText(name);
       const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
@@ -73,7 +71,6 @@ export const addNameToImage = (imageDataUrl: string, name: string): Promise<stri
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.fillRect(0, canvas.height - rectHeight - textPadding, canvas.width, rectHeight + textPadding);
 
-      // Draw text
       ctx.fillStyle = 'white';
       ctx.fillText(name, canvas.width / 2, canvas.height - textPadding);
 
@@ -96,14 +93,23 @@ export const downloadImagesAsZip = async (students: Student[], withNames: boolea
   const folder = zip.folder(folderName);
   if (!folder) return;
 
-  for (const student of students.filter(s => s.photo)) {
+  for (const student of students.filter(s => s.photo_url)) {
     try {
-      let imageDataUrl = student.photo!;
+      const response = await fetch(student.photo_url!);
+      const blob = await response.blob();
+      
+      let imageToAdd = blob;
       if (withNames) {
-        imageDataUrl = await addNameToImage(student.photo!, student.name);
+        const dataUrl = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+        });
+        const namedImage = await addNameToImage(dataUrl, student.name);
+        const res = await fetch(namedImage);
+        imageToAdd = await res.blob();
       }
-      const base64Data = imageDataUrl.split(',')[1];
-      folder.file(`${student.name}.jpg`, base64Data, { base64: true });
+      folder.file(`${student.name}.jpg`, imageToAdd);
     } catch (error) {
       console.error(`Failed to process image for ${student.name}:`, error);
     }
@@ -118,3 +124,23 @@ export const downloadImagesAsZip = async (students: Student[], withNames: boolea
   document.body.removeChild(link);
   URL.revokeObjectURL(link.href);
 };
+
+/**
+ * Converts a base64 data URL to a File object.
+ * @param dataurl The base64 data URL.
+ * @param filename The desired filename for the new File object.
+ * @returns A File object.
+ */
+export function dataURLtoFile(dataurl: string, filename: string): File {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) throw new Error("Invalid data URL");
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type: mime});
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { SchoolClass } from '../types';
-import { db } from '../db';
+import { supabase } from '../supabase';
 import Modal from './Modal';
 import { PlusIcon, SpinnerIcon, TrashIcon } from './icons';
 
@@ -20,16 +20,15 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
   const loadClasses = useCallback(async () => {
     setIsLoading(true);
     try {
-      const basicClasses = await db.getClasses();
-      const classesWithCounts = await Promise.all(
-        basicClasses.map(async (schoolClass) => {
-          const studentCount = await db.getStudentCountByClass(schoolClass.id);
-          return { ...schoolClass, studentCount };
-        })
-      );
-      setClasses(classesWithCounts);
+      const { data, error } = await supabase
+        .from('school_classes')
+        .select('*, students(count)')
+        .order('name');
+        
+      if (error) throw error;
+      setClasses(data as any[] || []);
     } catch (error) {
-      console.error("Failed to load classes or student counts:", error);
+      console.error("Failed to load classes:", error);
     } finally {
       setIsLoading(false);
     }
@@ -43,12 +42,17 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
     if (newClassName.trim() && !isSaving) {
       setIsSaving(true);
       try {
-        await db.addClass(newClassName.trim());
+        const { error } = await supabase
+          .from('school_classes')
+          .insert({ name: newClassName.trim() });
+
+        if (error) throw error;
         await loadClasses();
         setNewClassName('');
         setIsModalOpen(false);
       } catch (error) {
         console.error("Failed to add class:", error);
+        alert('حدث خطأ أثناء إضافة الشُعبة. قد يكون الاسم مكرراً.');
       } finally {
         setIsSaving(false);
       }
@@ -63,7 +67,12 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
     if (classToDelete) {
       setIsDeleting(true);
       try {
-        await db.deleteClass(classToDelete.id);
+        const { error } = await supabase
+          .from('school_classes')
+          .delete()
+          .eq('id', classToDelete.id);
+        
+        if (error) throw error;
         await loadClasses();
         setClassToDelete(null);
       } catch (error) {
@@ -109,11 +118,9 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
               <div onClick={() => onClassSelect(c)} className="cursor-pointer p-6 flex items-center justify-center">
                 <h3 className="text-xl font-semibold text-center text-gray-700 dark:text-gray-200">{c.name}</h3>
               </div>
-              {c.studentCount !== undefined && (
-                <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow pointer-events-none">
-                  {c.studentCount} طالب
-                </div>
-              )}
+              <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow pointer-events-none">
+                  {c.students?.[0]?.count ?? 0} طالب
+              </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

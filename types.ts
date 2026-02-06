@@ -1,14 +1,15 @@
 export interface SchoolClass {
   id: number;
   name: string;
-  studentCount?: number;
+  user_id: string;
+  students?: { count: number }[]; // From Supabase count
 }
 
 export interface Student {
   id: number;
   name: string;
-  classId: number;
-  photo?: string; // Raw photo as base64 data URL
+  class_id: number;
+  photo_url?: string | null;
 }
 
 declare global {

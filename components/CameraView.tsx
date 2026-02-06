@@ -7,7 +7,7 @@ import CropModal from './CropModal';
 interface CameraViewProps {
   student: Student;
   onClose: () => void;
-  onSave: (studentId: number, photoDataUrl: string) => void;
+  onSave: (studentId: number, photoDataUrl: string) => Promise<void>;
 }
 
 const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => {
@@ -49,7 +49,6 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   }, [stream]);
   
   useEffect(() => {
-    // Preload the shutter sound
     shutterSoundRef.current = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAI V1RYWlhAAAAAAAASW5mbwAAAA8AAABBAAAAAAAAAABoamgAAAAAAP//uQxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AAMIghAABp4Q0AqGgAAABNjb250ZW50X3R5cGUAYmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbQBkYXRhX3NvdXJjZQBzcmVjb3JkZWQ6c291cmNlAG1ldGFkYXRhX2V4cG9ydF92ZXJzaW9uATESAAAAAAAAAAAA//uQxAADASEBCAFqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq-');
     shutterSoundRef.current.volume = 0.6;
 
@@ -94,7 +93,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
       setProcessingFeedback(null);
     } catch (error) {
       console.error("Error during offline background removal:", error);
-      setCapturedImage(croppedImageDataUrl); // Fallback to original cropped image
+      setCapturedImage(croppedImageDataUrl);
       setProcessingFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام الصورة الأصلية.');
     } finally {
       setIsProcessing(false);
@@ -134,10 +133,8 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
 
         {!capturedImage && !originalImage && stream && (
           <div className="absolute inset-0 pointer-events-none">
-            {/* Passport-style frame overlay for face and shoulders */}
             <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[34%] h-4/5 text-white/40" viewBox="0 0 300 400" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="2" y="2" width="296" height="396" rx="30" stroke="currentColor" strokeWidth="4" strokeDasharray="10 8"/>
-                {/* Eye line */}
                 <line x1="50" y1="150" x2="250" y2="150" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5"/>
             </svg>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/4 h-1">

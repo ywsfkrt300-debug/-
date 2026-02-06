@@ -3,30 +3,55 @@ import type { SchoolClass } from './types';
 import ClassManager from './components/ClassManager';
 import StudentManager from './components/StudentManager';
 import Header from './components/Header';
+import Auth from './components/Auth';
+import { supabase } from './supabase';
+import type { Session } from '@supabase/supabase-js';
 import { preloadBackgroundRemover } from './utils/backgroundRemover';
 
 const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
   const [selectedClass, setSelectedClass] = useState<SchoolClass | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Preload the offline background remover model on app start
-    // to ensure it's ready when needed without delay.
     preloadBackgroundRemover();
-  }, []);
+    
+    const getSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setLoading(false);
+    };
+    getSession();
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (_event === 'SIGNED_OUT') {
+          setSelectedClass(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleBackToClasses = () => {
     setSelectedClass(null);
   };
   
+  if (loading) {
+      return null; // Or a loading spinner
+  }
+
   return (
     <div className="min-h-screen transition-colors duration-300 flex flex-col">
       <Header 
+        session={session}
         className={selectedClass?.name} 
-        onBack={selectedClass ? handleBackToClasses : undefined} 
+        onBack={selectedClass && session ? handleBackToClasses : undefined} 
       />
       <main className="p-4 sm:p-6 md:p-8 flex-grow">
-        {selectedClass ? (
+        {!session ? (
+          <Auth />
+        ) : selectedClass ? (
           <StudentManager schoolClass={selectedClass} />
         ) : (
           <ClassManager onClassSelect={setSelectedClass} />
