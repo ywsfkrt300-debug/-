@@ -11,6 +11,14 @@ const Auth: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        setMessage('الرجاء إدخال عنوان بريد إلكتروني صالح.');
+        setLoading(false);
+        return;
+    }
+
     try {
         const { error } = await supabase.auth.signInWithOtp({
           email,
@@ -22,7 +30,15 @@ const Auth: React.FC = () => {
         setMessage('تم إرسال رابط تسجيل الدخول إلى بريدك الإلكتروني. يرجى التحقق منه!');
     } catch (error: any) {
         console.error('Error logging in:', error);
-        setMessage(`فشل تسجيل الدخول: ${error.error_description || error.message}`);
+        let userMessage = 'فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+        if (typeof error.message === 'string') {
+            if (error.message.toLowerCase().includes('rate limit')) {
+                userMessage = 'لقد حاولت تسجيل الدخول عدة مرات. يرجى الانتظار قليلاً قبل المحاولة مرة أخرى.';
+            } else if (error.message.toLowerCase().includes('check your email')) {
+                userMessage = 'تم إرسال رابط بالفعل. يرجى التحقق من بريدك الإلكتروني أو الانتظار قبل طلب رابط جديد.';
+            }
+        }
+        setMessage(userMessage);
     } finally {
         setLoading(false);
     }
@@ -67,7 +83,7 @@ const Auth: React.FC = () => {
         </div>
       </form>
        {message && (
-        <div className={`mt-4 text-center p-3 rounded-md text-sm ${message.startsWith('فشل') ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' : 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'}`}>
+        <div className={`mt-4 text-center p-3 rounded-md text-sm ${message.startsWith('فشل') || message.includes('صالح') || message.includes('الانتظار') || message.includes('بالفعل') ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' : 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'}`}>
             {message}
         </div>
       )}
