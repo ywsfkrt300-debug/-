@@ -124,6 +124,16 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
       setIsDownloadingZip(false);
     }
   };
+  
+  const handleDownloadSingleImage = (student: Student) => {
+    if (!student.photo) return;
+    const link = document.createElement('a');
+    link.href = student.photo;
+    link.download = `${student.name}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -169,6 +179,9 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
               <div className="flex items-center gap-2">
                   {student.photo && (
                       <>
+                          <button onClick={() => handleDownloadSingleImage(student)} className="p-2 text-gray-600 hover:text-green-600 dark:text-gray-300 dark:hover:text-green-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="حفظ الصورة على الجهاز">
+                              <DownloadIcon className="w-5 h-5" />
+                          </button>
                           <button onClick={() => setImageToView(student.photo)} className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="عرض الصورة">
                               <EyeIcon className="w-5 h-5" />
                           </button>
