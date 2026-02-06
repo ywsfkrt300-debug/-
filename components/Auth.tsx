@@ -12,7 +12,12 @@ const Auth: React.FC = () => {
     setLoading(true);
     setMessage('');
     try {
-        const { error } = await supabase.auth.signInWithOtp({ email });
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: window.location.origin,
+          },
+        });
         if (error) throw error;
         setMessage('تم إرسال رابط تسجيل الدخول إلى بريدك الإلكتروني. يرجى التحقق منه!');
     } catch (error: any) {
