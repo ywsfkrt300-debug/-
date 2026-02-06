@@ -1,13 +1,12 @@
 import React from 'react';
-import { BackArrowIcon, CogIcon } from './icons';
+import { BackArrowIcon } from './icons';
 
 interface HeaderProps {
   className?: string;
   onBack?: () => void;
-  onShowSettings: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ className, onBack, onShowSettings }) => {
+const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 shadow-md sticky top-0 z-10 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,14 +31,6 @@ const Header: React.FC<HeaderProps> = ({ className, onBack, onShowSettings }) =>
                 <span>العودة للشُعب</span>
               </button>
             )}
-            <button
-                onClick={onShowSettings}
-                className="p-2 rounded-full text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 transition"
-                aria-label="إعدادات API"
-                title="إعدادات مفتاح Gemini API"
-            >
-                <CogIcon className="w-6 h-6" />
-            </button>
           </div>
         </div>
       </div>

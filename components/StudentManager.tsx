@@ -4,7 +4,7 @@ import { db } from '../db';
 import { downloadImagesAsZip } from '../utils/imageUtils';
 import Modal from './Modal';
 import CameraView from './CameraView';
-import { PlusIcon, DownloadIcon, CameraIcon, SpinnerIcon, TrashIcon } from './icons';
+import { PlusIcon, DownloadIcon, CameraIcon, SpinnerIcon, TrashIcon, EyeIcon, CheckCircleIcon } from './icons';
 
 interface StudentManagerProps {
   schoolClass: SchoolClass;
@@ -29,7 +29,6 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
     setIsLoading(true);
     try {
       const data = await db.getStudentsByClass(schoolClass.id);
-      // Sort students alphabetically by name (respecting Arabic characters)
       data.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
       setStudents(data);
     } catch (error) {
@@ -156,52 +155,35 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
           <p className="text-lg text-gray-600 dark:text-gray-300">لم يتم إضافة أي طالب لهذه الشُعبة بعد.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 fade-in">
+        <div className="space-y-3 fade-in">
           {students.map((student) => (
-            <div key={student.id} className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-md overflow-hidden group transition-all duration-300 hover:shadow-xl hover:scale-105">
-              <div className="relative aspect-[3/4]">
-                {student.photo ? (
-                  <img src={student.photo} alt={student.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-gray-200/50 dark:bg-gray-700/50 flex items-center justify-center">
-                    <CameraIcon className="w-16 h-16 text-gray-400 dark:text-gray-500" />
-                  </div>
-                )}
-                <div 
-                  className="absolute inset-0 cursor-pointer"
-                  onClick={() => student.photo && setImageToView(student.photo)}
-                />
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 group-hover:opacity-0">
-                  <h3 className="font-semibold text-lg text-white text-center truncate">{student.name}</h3>
-                </div>
-
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 gap-3 text-white">
-                    <h3 className="font-bold text-xl text-center">{student.name}</h3>
-                    <div className="flex flex-col items-stretch gap-2 w-full max-w-[150px]">
-                        {student.photo ? (
-                            <>
-                                <button onClick={() => setStudentToPhotograph(student)} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors text-sm">
-                                    <CameraIcon className="w-4 h-4" />
-                                    <span>إعادة التصوير</span>
-                                </button>
-                                <button onClick={() => openDeletePhotoConfirm(student.id)} disabled={deletingPhotoStudentId === student.id} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors disabled:bg-red-400 text-sm">
-                                    {deletingPhotoStudentId === student.id ? <SpinnerIcon className="w-4 h-4" /> : <TrashIcon className="w-4 h-4" />}
-                                    <span>حذف الصورة</span>
-                                </button>
-                            </>
-                        ) : (
-                            <button onClick={() => setStudentToPhotograph(student)} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors">
-                                <CameraIcon className="w-5 h-5" />
-                                <span>تصوير</span>
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <button onClick={() => openDeleteStudentModal(student)} className="absolute top-2 left-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700 transition-all opacity-0 group-hover:opacity-100" title={`حذف الطالب ${student.name}`}>
-                    <TrashIcon className="w-4 h-4" />
-                </button>
+            <div key={student.id} className="flex items-center justify-between p-3 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-4">
+                  {student.photo ? (
+                      <CheckCircleIcon className="w-7 h-7 text-green-500" title="تم التصوير"/>
+                  ) : (
+                      <CameraIcon className="w-7 h-7 text-gray-400" title="لم يتم التصوير"/>
+                  )}
+                  <span className="font-semibold text-lg text-gray-800 dark:text-gray-200">{student.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                  {student.photo && (
+                      <>
+                          <button onClick={() => setImageToView(student.photo)} className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="عرض الصورة">
+                              <EyeIcon className="w-5 h-5" />
+                          </button>
+                          <button onClick={() => openDeletePhotoConfirm(student.id)} className="p-2 text-gray-600 hover:text-yellow-600 dark:text-gray-300 dark:hover:text-yellow-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="حذف الصورة فقط">
+                              <TrashIcon className="w-5 h-5" />
+                          </button>
+                      </>
+                  )}
+                  <button onClick={() => setStudentToPhotograph(student)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold bg-teal-600 text-white rounded-md shadow-sm hover:bg-teal-700 transition-colors">
+                      <CameraIcon className="w-4 h-4" />
+                      <span>{student.photo ? 'إعادة التصوير' : 'تصوير'}</span>
+                  </button>
+                  <button onClick={() => openDeleteStudentModal(student)} className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-500 transition-colors rounded-full hover:bg-red-100 dark:hover:bg-red-900/50" title={`حذف الطالب ${student.name}`}>
+                      <TrashIcon className="w-5 h-5" />
+                  </button>
               </div>
             </div>
           ))}

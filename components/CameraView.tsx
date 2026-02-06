@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Student } from '../types';
 import { SpinnerIcon, SwitchCameraIcon } from './icons';
-import { analyzeStudentPhoto, removeBackgroundImage } from '../utils/geminiUtils';
 import { removeBackgroundOffline } from '../utils/backgroundRemover';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import CropModal from './CropModal';
 
 interface CameraViewProps {
@@ -22,11 +20,9 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisFeedback, setAnalysisFeedback] = useState<string | null>(null);
+  const [processingFeedback, setProcessingFeedback] = useState<string | null>(null);
   const [tilt, setTilt] = useState(0);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
-  const isOnline = useOnlineStatus();
 
   const startCamera = useCallback(async (mode: 'user' | 'environment') => {
       if (stream) {
@@ -54,7 +50,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   
   useEffect(() => {
     // Preload the shutter sound
-    shutterSoundRef.current = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAI V1RYWlhAAAAAAAASW5mbwAAAA8AAABBAAAAAAAAAABoamgAAAAAAP//uQxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AAMIghAABp4Q0AqGgAAABNjb250ZW50X3R5cGUAYmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbQBkYXRhX3NvdXJjZQBzcmVjb3JkZWQ6c291cmNlAG1ldGFkYXRhX2V4cG9ydF92ZXJzaW9uATESAAAAAAAAAAAA//uQxAADASEBCAFqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq-');
+    shutterSoundRef.current = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAI V1RYWlhAAAAAAAASW5mbwAAAA8AAABBAAAAAAAAAABoamgAAAAAAP//uQxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AAMIghAABp4Q0AqGgAAABNjb250ZW50X3R5cGUAYmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbQBkYXRhX3NvdXJjZQBzcmVjb3JkZWQ6c291cmNlAG1ldGFkYXRhX2V4cG9ydF92ZXJzaW9uATESAAAAAAAAAAAA//uQxAADASEBCAFqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq-');
     shutterSoundRef.current.volume = 0.6;
 
     startCamera(facingMode);
@@ -90,46 +86,16 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   const processCroppedImage = async (croppedImageDataUrl: string) => {
     setOriginalImage(null);
     setCapturedImage(croppedImageDataUrl);
-    setAnalysisFeedback(null);
-    
-    if (isOnline) {
-      setIsAnalyzing(true);
-      try {
-        const analysis = await analyzeStudentPhoto(croppedImageDataUrl);
-        setIsAnalyzing(false);
-        if (!analysis.isGood) {
-          setAnalysisFeedback(analysis.feedback);
-          return;
-        }
-        setAnalysisFeedback('الصورة ممتازة! جاري إزالة الخلفية...');
-        setIsProcessing(true);
-        const processedImage = await removeBackgroundImage(croppedImageDataUrl);
-        setCapturedImage(processedImage);
-        setAnalysisFeedback(null);
-      } catch (error) {
-        console.error("Error during AI processing:", error);
-        setAnalysisFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام المعالج المحلي.');
-        await processOffline(croppedImageDataUrl);
-      } finally {
-        setIsAnalyzing(false);
-        setIsProcessing(false);
-      }
-    } else {
-        await processOffline(croppedImageDataUrl);
-    }
-  };
-
-  const processOffline = async (imageDataUrl: string) => {
-    setAnalysisFeedback('أنت غير متصل بالإنترنت. سيتم إزالة الخلفية محلياً.');
+    setProcessingFeedback('جاري إزالة الخلفية...');
     setIsProcessing(true);
     try {
-      const processedImage = await removeBackgroundOffline(imageDataUrl);
+      const processedImage = await removeBackgroundOffline(croppedImageDataUrl);
       setCapturedImage(processedImage);
-      setAnalysisFeedback(null);
+      setProcessingFeedback(null);
     } catch (error) {
       console.error("Error during offline background removal:", error);
-      setCapturedImage(imageDataUrl); // Fallback to original cropped image
-      setAnalysisFeedback('حدث خطأ أثناء المعالجة المحلية، سيتم استخدام الصورة الأصلية.');
+      setCapturedImage(croppedImageDataUrl); // Fallback to original cropped image
+      setProcessingFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام الصورة الأصلية.');
     } finally {
       setIsProcessing(false);
     }
@@ -138,7 +104,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   const handleRetake = () => {
     setOriginalImage(null);
     setCapturedImage(null);
-    setAnalysisFeedback(null);
+    setProcessingFeedback(null);
   };
   
   const handleSave = async () => {
@@ -156,7 +122,6 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center items-center p-4">
       <div className="absolute top-4 right-4 text-white font-bold text-xl sm:text-2xl z-20">{student.name}</div>
       <div className="absolute top-12 right-4 text-white/80 text-sm sm:text-lg z-20 text-center max-w-[90vw]">
-        {!isOnline && <p className="text-yellow-400 font-bold bg-black/50 px-2 py-1 rounded-md mb-2">⚠️ أنت غير متصل بالإنترنت. تم تعطيل فحص الجودة.</p>}
         {!capturedImage && !originalImage && <p>ضع الوجه داخل الإطار وحاذِ العينين مع الخط الأفقي</p>}
         <p className={isLevel ? 'text-green-400' : 'text-yellow-400'}>{isLevel ? 'الجهاز مستقيم' : 'حافظ على استقامة الجهاز'}</p>
       </div>
@@ -188,17 +153,15 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
           </div>
         )}
         
-        {(isAnalyzing || isProcessing) && (
+        {isProcessing && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black bg-opacity-80 z-30 overflow-hidden">
-            {isAnalyzing && <div className="absolute inset-0"><div className="scan-line" /></div>}
             <SpinnerIcon className="w-12 h-12" />
-            <p className="mt-4 text-lg">{isAnalyzing ? 'جاري فحص جودة الصورة...' : 'جاري معالجة الخلفية...'}</p>
+            <p className="mt-4 text-lg">{processingFeedback || 'جاري معالجة الخلفية...'}</p>
           </div>
         )}
-        {analysisFeedback && !isAnalyzing && (
-          <div className={`absolute bottom-4 right-4 left-4 ${analysisFeedback.startsWith('الصورة ممتازة') ? 'bg-green-800/80' : 'bg-red-800/80'} text-white p-3 rounded-lg z-30 text-center`}>
-            <p className="font-bold">ملاحظة:</p>
-            <p>{analysisFeedback}</p>
+         {processingFeedback && !isProcessing && (
+          <div className={`absolute bottom-4 right-4 left-4 bg-yellow-800/80 text-white p-3 rounded-lg z-30 text-center`}>
+            <p>{processingFeedback}</p>
           </div>
         )}
       </div>
@@ -213,8 +176,8 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
             </>
           ) : !originalImage ? (
             <>
-              <button onClick={handleRetake} disabled={isAnalyzing || isProcessing || isSaving} className="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition disabled:bg-gray-400">إعادة التصوير</button>
-              <button onClick={handleSave} disabled={isSaving || isAnalyzing || isProcessing || (!!analysisFeedback && !analysisFeedback.startsWith('الصورة ممتازة'))} className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition disabled:bg-gray-400 flex items-center gap-2">
+              <button onClick={handleRetake} disabled={isProcessing || isSaving} className="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition disabled:bg-gray-400">إعادة التصوير</button>
+              <button onClick={handleSave} disabled={isSaving || isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition disabled:bg-gray-400 flex items-center gap-2">
                 {isSaving && <SpinnerIcon className="w-5 h-5"/>}
                 {isSaving ? 'جاري الحفظ...' : 'حفظ الصورة'}
               </button>
