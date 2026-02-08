@@ -45,7 +45,7 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 bg-white/70 backdrop-blur-sm rounded-lg shadow-xl">
+    <div className="w-full max-w-md p-6 bg-white/70 backdrop-blur-sm rounded-lg shadow-xl">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-800">مرحباً بك في صوّرني</h1>
         <p className="mt-2 text-gray-600">

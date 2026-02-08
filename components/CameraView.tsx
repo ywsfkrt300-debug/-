@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Student } from '../types';
 import { SpinnerIcon, SwitchCameraIcon, NoSymbolIcon } from './icons';
-import { removeBackgroundOffline } from '../utils/backgroundRemover';
+import { removeBackground } from '../utils/backgroundRemover';
 import CropModal from './CropModal';
 
 interface CameraViewProps {
@@ -78,24 +78,25 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
 
     const process = async () => {
       setIsProcessing(true);
-      setProcessingFeedback(backgroundColor ? 'جاري تطبيق الخلفية...' : 'جاري تحميل الصورة الأصلية...');
+      setProcessingFeedback(backgroundColor ? 'جاري إزالة الخلفية عبر الإنترنت...' : 'جاري تحميل الصورة الأصلية...');
+      let hasError = false;
 
       try {
         if (backgroundColor) {
-          const processedImage = await removeBackgroundOffline(imageForProcessing, backgroundColor);
+          const processedImage = await removeBackground(imageForProcessing, backgroundColor);
           setFinalImage(processedImage);
         } else {
           // User selected "Original" background
           setFinalImage(imageForProcessing);
         }
-      } catch (error) {
+      } catch (error: any) {
+        hasError = true;
         console.error("Error during background processing:", error);
         setFinalImage(imageForProcessing); // Fallback to cropped image
-        setProcessingFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام الصورة المقصوصة.');
+        setProcessingFeedback(`فشل إزالة الخلفية: ${error.message}. سيتم استخدام الصورة المقصوصة.`);
       } finally {
         setIsProcessing(false);
-        // Don't clear feedback immediately if there was an error
-        if (!processingFeedback?.includes('خطأ')) {
+        if (!hasError) {
             setProcessingFeedback(null);
         }
       }

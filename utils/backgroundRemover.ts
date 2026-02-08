@@ -1,69 +1,81 @@
-// This file uses the MediaPipe SelfieSegmentation library, which is loaded via a script tag in index.html.
-// We declare the global variable here to satisfy TypeScript.
-declare const SelfieSegmentation: any;
+/**
+ * Helper function to convert data URL to Blob
+ * @param dataurl The base64 data URL.
+ * @returns A Blob object.
+ */
+const dataURLtoBlob = (dataurl: string): Blob => {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) {
+        throw new Error('Invalid data URL');
+    }
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+}
+
 
 /**
- * Removes the background from an image data URL and replaces it with a solid color background.
- * This function works entirely on the client-side, offline.
- * It creates a new segmenter instance for each call to prevent state corruption from concurrent requests.
+ * Removes the background from an image data URL using the remove.bg API.
+ * This is an online operation and requires an internet connection.
  * @param imageDataUrl The base64 data URL of the image to process.
  * @param backgroundColor The hex code of the color to use for the background.
  * @returns A promise that resolves with the new image data URL with the specified background color.
  */
-export const removeBackgroundOffline = (imageDataUrl: string, backgroundColor: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        // Create a new instance for each operation to ensure isolation and prevent race conditions.
-        const segmenter = new SelfieSegmentation({
-            locateFile: (file: string) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
-            }
-        });
+export const removeBackground = async (imageDataUrl: string, backgroundColor: string): Promise<string> => {
+    const apiKey = "eNkwhVq732chwvNB2Go5K329";
+    const apiUrl = "https://api.remove.bg/v1.0/removebg";
 
-        segmenter.setOptions({
-            modelSelection: 1, // Optimized for landscape photos.
-        });
+    try {
+        const imageBlob = dataURLtoBlob(imageDataUrl);
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-            segmenter.close(); // Clean up resources
-            return reject(new Error('Could not get canvas context'));
+        const formData = new FormData();
+        formData.append('image_file', imageBlob, 'student_photo.jpg');
+        formData.append('size', 'auto');
+        formData.append('format', 'json');
+        
+        // remove.bg uses transparent background if no color is specified.
+        if (backgroundColor) {
+            formData.append('bg_color', backgroundColor);
         }
-        
-        const image = new Image();
-        image.onload = async () => {
-            canvas.width = image.width;
-            canvas.height = image.height;
-            
-            segmenter.onResults((results: any) => {
-                ctx.save();
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = backgroundColor;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.globalCompositeOperation = 'source-in';
-                ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-                ctx.restore();
-                
-                // IMPORTANT: Close the segmenter to free up WebAssembly memory and resources.
-                segmenter.close();
-                resolve(canvas.toDataURL('image/jpeg', 0.9));
-            });
-            
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'X-API-Key': apiKey,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            // Try to parse error from remove.bg for better feedback
+            let errorMessage = `API request failed with status ${response.status}.`;
             try {
-                await segmenter.send({ image: image });
-            } catch (error) {
-                segmenter.close(); // Clean up on error
-                reject(error);
+                const errorData = await response.json();
+                if (errorData.errors && errorData.errors.length > 0) {
+                    errorMessage = errorData.errors[0].title || errorMessage;
+                }
+            } catch (e) {
+                // Could not parse JSON, use the status text.
+                errorMessage = `${errorMessage} ${response.statusText}`;
             }
-        };
-        
-        image.onerror = (err) => {
-            segmenter.close(); // Clean up on error
-            reject(err);
-        };
-        image.src = imageDataUrl;
-    });
+            console.error('remove.bg API error:', errorMessage);
+            throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        if (result.data && result.data.result_b64) {
+            return `data:image/png;base64,${result.data.result_b64}`;
+        } else {
+            throw new Error('Invalid response data from remove.bg API');
+        }
+    } catch (error) {
+        console.error("Error calling remove.bg API:", error);
+        throw error; // Re-throw to be handled by the calling component
+    }
 };
