@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>تطبيق صوّرني</title>
+    <script>
+      // Configure Tailwind CSS to use the 'class' strategy for dark mode.
+      // This must be done before the Tailwind script is loaded.
+      tailwind.config = {
+        darkMode: 'class',
+      };
+
+      // To prevent a flash of unstyled content (FOUC), we set the theme class
+      // on the <html> element immediately based on localStorage or system preference.
+      if (localStorage.getItem('sawwirni_theme') === 'dark' || (!('sawwirni_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,10 +28,6 @@
     <style>
       body {
         font-family: 'Cairo', sans-serif;
-        background-image: url('https://image2url.com/r2/default/images/1770534790115-fa4ca81e-8933-4846-9d29-2a331d298107.jpg');
-        background-size: cover;
-        background-position: center center;
-        background-attachment: fixed;
       }
       @keyframes scan-vertical {
         0% { top: 0%; }
@@ -58,7 +69,7 @@
 }
 </script>
 </head>
-  <body class="text-gray-800 dark:text-gray-200">
+  <body class="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900">
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
   </body>

@@ -1,12 +1,14 @@
 import React from 'react';
-import { BackArrowIcon } from './icons';
+import { BackArrowIcon, MoonIcon, SunIcon } from './icons';
 
 interface HeaderProps {
   className?: string;
   onBack?: () => void;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
+const Header: React.FC<HeaderProps> = ({ className, onBack, theme, toggleTheme }) => {
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 shadow-md sticky top-0 z-10 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -31,6 +33,17 @@ const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
                 <span>العودة للشُعب</span>
               </button>
             )}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full text-gray-700 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+              aria-label={theme === 'light' ? 'التحويل للوضع الليلي' : 'التحويل للوضع النهاري'}
+            >
+              {theme === 'light' ? (
+                <MoonIcon className="w-5 h-5" />
+              ) : (
+                <SunIcon className="w-5 h-5" />
+              )}
+            </button>
           </div>
         </div>
       </div>
