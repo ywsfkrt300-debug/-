@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { SchoolClass } from '../types';
-import { supabase } from '../supabase';
+import { getClassesWithStudentCounts, addClass, deleteClass } from '../db';
 import Modal from './Modal';
 import { PlusIcon, SpinnerIcon, TrashIcon } from './icons';
 
@@ -8,25 +8,22 @@ interface ClassManagerProps {
   onClassSelect: (schoolClass: SchoolClass) => void;
 }
 
+type ClassWithCount = SchoolClass & { studentCount: number };
+
 const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [classes, setClasses] = useState<ClassWithCount[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [classToDelete, setClassToDelete] = useState<SchoolClass | null>(null);
+  const [classToDelete, setClassToDelete] = useState<ClassWithCount | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadClasses = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('school_classes')
-        .select('*, students(count)')
-        .order('name');
-        
-      if (error) throw error;
-      setClasses(data as any[] || []);
+      const data = await getClassesWithStudentCounts();
+      setClasses(data);
     } catch (error) {
       console.error("Failed to load classes:", error);
     } finally {
@@ -42,24 +39,20 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
     if (newClassName.trim() && !isSaving) {
       setIsSaving(true);
       try {
-        const { error } = await supabase
-          .from('school_classes')
-          .insert({ name: newClassName.trim() });
-
-        if (error) throw error;
+        await addClass(newClassName.trim());
         await loadClasses();
         setNewClassName('');
         setIsModalOpen(false);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to add class:", error);
-        alert('حدث خطأ أثناء إضافة الشُعبة. قد يكون الاسم مكرراً.');
+        alert(error.message === 'Class name already exists' ? 'اسم الشعبة موجود بالفعل. يرجى اختيار اسم آخر.' : 'حدث خطأ أثناء إضافة الشُعبة.');
       } finally {
         setIsSaving(false);
       }
     }
   };
 
-  const handleOpenDeleteModal = (schoolClass: SchoolClass) => {
+  const handleOpenDeleteModal = (schoolClass: ClassWithCount) => {
     setClassToDelete(schoolClass);
   };
 
@@ -67,12 +60,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
     if (classToDelete) {
       setIsDeleting(true);
       try {
-        const { error } = await supabase
-          .from('school_classes')
-          .delete()
-          .eq('id', classToDelete.id);
-        
-        if (error) throw error;
+        await deleteClass(classToDelete.id);
         await loadClasses();
         setClassToDelete(null);
       } catch (error) {
@@ -119,7 +107,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
                 <h3 className="text-xl font-semibold text-center text-gray-700 dark:text-gray-200">{c.name}</h3>
               </div>
               <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow pointer-events-none">
-                  {c.students?.[0]?.count ?? 0} طالب
+                  {c.studentCount} طالب
               </div>
               <button
                 onClick={(e) => {

@@ -1,19 +1,12 @@
 import React from 'react';
-import { BackArrowIcon, LogoutIcon } from './icons';
-import { supabase } from '../supabase';
-import type { Session } from '@supabase/supabase-js';
+import { BackArrowIcon } from './icons';
 
 interface HeaderProps {
-  session: Session | null;
   className?: string;
   onBack?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ session, className, onBack }) => {
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
-
+const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 shadow-md sticky top-0 z-10 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,19 +30,6 @@ const Header: React.FC<HeaderProps> = ({ session, className, onBack }) => {
                 <BackArrowIcon className="w-5 h-5" />
                 <span>العودة للشُعب</span>
               </button>
-            )}
-            {session && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 dark:text-gray-300 hidden sm:block">{session.user.email}</span>
-                 <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-gray-700 dark:text-red-300 dark:hover:bg-gray-600 transition"
-                    title="تسجيل الخروج"
-                >
-                    <LogoutIcon className="w-5 h-5" />
-                    <span className="hidden sm:inline">خروج</span>
-                </button>
-              </div>
             )}
           </div>
         </div>

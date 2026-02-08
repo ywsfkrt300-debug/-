@@ -93,19 +93,14 @@ export const downloadImagesAsZip = async (students: Student[], withNames: boolea
   const folder = zip.folder(folderName);
   if (!folder) return;
 
-  for (const student of students.filter(s => s.photo_url)) {
+  for (const student of students.filter(s => s.photo_data_url)) {
     try {
-      const response = await fetch(student.photo_url!);
+      const response = await fetch(student.photo_data_url!);
       const blob = await response.blob();
       
       let imageToAdd = blob;
       if (withNames) {
-        const dataUrl = await new Promise<string>(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-        });
-        const namedImage = await addNameToImage(dataUrl, student.name);
+        const namedImage = await addNameToImage(student.photo_data_url!, student.name);
         const res = await fetch(namedImage);
         imageToAdd = await res.blob();
       }
@@ -124,23 +119,3 @@ export const downloadImagesAsZip = async (students: Student[], withNames: boolea
   document.body.removeChild(link);
   URL.revokeObjectURL(link.href);
 };
-
-/**
- * Converts a base64 data URL to a File object.
- * @param dataurl The base64 data URL.
- * @param filename The desired filename for the new File object.
- * @returns A File object.
- */
-export function dataURLtoFile(dataurl: string, filename: string): File {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) throw new Error("Invalid data URL");
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, {type: mime});
-}

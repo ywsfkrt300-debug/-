@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { SchoolClass, Student } from '../types';
-import { supabase } from '../supabase';
-import { downloadImagesAsZip, dataURLtoFile } from '../utils/imageUtils';
+import { getStudentsByClass, addStudent, deleteStudent, updateStudentPhoto, deleteStudentPhoto } from '../db';
+import { downloadImagesAsZip } from '../utils/imageUtils';
 import Modal from './Modal';
 import CameraView from './CameraView';
 import { PlusIcon, DownloadIcon, CameraIcon, SpinnerIcon, TrashIcon, EyeIcon, CheckCircleIcon } from './icons';
@@ -28,13 +28,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
   const loadStudents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('class_id', schoolClass.id)
-        .order('name');
-
-      if (error) throw error;
+      const data = await getStudentsByClass(schoolClass.id);
       setStudents(data);
     } catch (error) {
       console.error("Failed to load students:", error);
@@ -51,11 +45,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
     if (newStudentName.trim() && !isSaving) {
       setIsSaving(true);
       try {
-        const { error } = await supabase
-          .from('students')
-          .insert({ name: newStudentName.trim(), class_id: schoolClass.id });
-
-        if (error) throw error;
+        await addStudent(newStudentName.trim(), schoolClass.id);
         await loadStudents();
         setNewStudentName('');
         setIsModalOpen(false);
@@ -69,34 +59,8 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
   };
 
   const handleSavePhoto = async (studentId: number, photoDataUrl: string) => {
-    const student = students.find(s => s.id === studentId);
-    if (!student) return;
-
     try {
-      // 1. Convert Data URL to file
-      const photoFile = dataURLtoFile(photoDataUrl, `${student.name.replace(/\s+/g, '_')}.jpg`);
-      
-      // 2. Upload to Supabase Storage
-      const filePath = `${schoolClass.id}/${student.id}-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from('student_photos')
-        .upload(filePath, photoFile, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // 3. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('student_photos')
-        .getPublicUrl(filePath);
-
-      // 4. Update student record in DB
-      const { error: updateError } = await supabase
-        .from('students')
-        .update({ photo_url: publicUrl })
-        .eq('id', student.id);
-
-      if (updateError) throw updateError;
-
+      await updateStudentPhoto(studentId, photoDataUrl);
       setStudentToPhotograph(null);
       await loadStudents();
     } catch (error) {
@@ -114,13 +78,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
     if (!studentToDelete) return;
     setIsDeleting(true);
     try {
-      // Delete from DB (storage file will be deleted by CASCADE if policies are set correctly, but manual is safer)
-      if (studentToDelete.photo_url) {
-        const path = new URL(studentToDelete.photo_url).pathname.split('/student_photos/')[1];
-        await supabase.storage.from('student_photos').remove([path]);
-      }
-      const { error } = await supabase.from('students').delete().eq('id', studentToDelete.id);
-      if (error) throw error;
+      await deleteStudent(studentToDelete.id);
       await loadStudents();
       setStudentToDelete(null);
     } catch (error) {
@@ -140,21 +98,8 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
     if (!studentIdForPhotoDeleteConfirm) return;
     setIsDeletingPhoto(true);
     try {
-        const student = students.find(s => s.id === studentIdForPhotoDeleteConfirm);
-        if (student && student.photo_url) {
-            // 1. Delete from Storage
-            const path = new URL(student.photo_url).pathname.split('/student_photos/')[1];
-            await supabase.storage.from('student_photos').remove([path]);
-            
-            // 2. Update DB record
-            const { error } = await supabase
-              .from('students')
-              .update({ photo_url: null })
-              .eq('id', student.id);
-            if(error) throw error;
-            
-            await loadStudents();
-        }
+        await deleteStudentPhoto(studentIdForPhotoDeleteConfirm);
+        await loadStudents();
     } catch (error) {
         console.error("Failed to delete student photo:", error);
         alert('حدث خطأ أثناء حذف الصورة.');
@@ -177,17 +122,14 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
   };
   
   const handleDownloadSingleImage = async (student: Student) => {
-    if (!student.photo_url) return;
+    if (!student.photo_data_url) return;
     try {
-        const response = await fetch(student.photo_url);
-        const blob = await response.blob();
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
+        link.href = student.photo_data_url;
         link.download = `${student.name}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
     } catch (error) {
         console.error("Failed to download image:", error);
         alert("فشل تحميل الصورة.");
@@ -203,7 +145,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
                 <input type="checkbox" id="withNames" checked={withNames} onChange={(e) => setWithNames(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"/>
                 <label htmlFor="withNames" className="text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer">تضمين الأسماء</label>
             </div>
-            <button onClick={handleDownloadZip} disabled={isDownloadingZip || students.filter(s => s.photo_url).length === 0} className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:bg-gray-400">
+            <button onClick={handleDownloadZip} disabled={isDownloadingZip || students.filter(s => s.photo_data_url).length === 0} className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:bg-gray-400">
                 {isDownloadingZip ? <SpinnerIcon className="w-5 h-5"/> : <DownloadIcon className="w-5 h-5" />}
                 <span>{isDownloadingZip ? 'جاري التحضير...' : 'تحميل الكل (ZIP)'}</span>
             </button>
@@ -228,20 +170,26 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
           {students.map((student) => (
             <div key={student.id} className="flex items-center justify-between p-3 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center gap-4">
-                  {student.photo_url ? (
-                      <CheckCircleIcon className="w-7 h-7 text-green-500" title="تم التصوير"/>
+                  {student.photo_data_url ? (
+// FIX: Wrap icon in a span with a title attribute for tooltip functionality.
+                      <span title="تم التصوير">
+                        <CheckCircleIcon className="w-7 h-7 text-green-500"/>
+                      </span>
                   ) : (
-                      <CameraIcon className="w-7 h-7 text-gray-400" title="لم يتم التصوير"/>
+// FIX: Wrap icon in a span with a title attribute for tooltip functionality.
+                      <span title="لم يتم التصوير">
+                        <CameraIcon className="w-7 h-7 text-gray-400"/>
+                      </span>
                   )}
                   <span className="font-semibold text-lg text-gray-800 dark:text-gray-200">{student.name}</span>
               </div>
               <div className="flex items-center gap-2">
-                  {student.photo_url && (
+                  {student.photo_data_url && (
                       <>
                           <button onClick={() => handleDownloadSingleImage(student)} className="p-2 text-gray-600 hover:text-green-600 dark:text-gray-300 dark:hover:text-green-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="حفظ الصورة على الجهاز">
                               <DownloadIcon className="w-5 h-5" />
                           </button>
-                          <button onClick={() => setImageToView(student.photo_url!)} className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="عرض الصورة">
+                          <button onClick={() => setImageToView(student.photo_data_url!)} className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="عرض الصورة">
                               <EyeIcon className="w-5 h-5" />
                           </button>
                           <button onClick={() => openDeletePhotoConfirm(student.id)} className="p-2 text-gray-600 hover:text-yellow-600 dark:text-gray-300 dark:hover:text-yellow-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="حذف الصورة فقط">
@@ -251,7 +199,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
                   )}
                   <button onClick={() => setStudentToPhotograph(student)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold bg-teal-600 text-white rounded-md shadow-sm hover:bg-teal-700 transition-colors">
                       <CameraIcon className="w-4 h-4" />
-                      <span>{student.photo_url ? 'إعادة التصوير' : 'تصوير'}</span>
+                      <span>{student.photo_data_url ? 'إعادة التصوير' : 'تصوير'}</span>
                   </button>
                   <button onClick={() => openDeleteStudentModal(student)} className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-500 transition-colors rounded-full hover:bg-red-100 dark:hover:bg-red-900/50" title={`حذف الطالب ${student.name}`}>
                       <TrashIcon className="w-5 h-5" />
