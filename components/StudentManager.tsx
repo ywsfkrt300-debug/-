@@ -4,7 +4,7 @@ import { getStudentsByClass, addStudent, deleteStudent, updateStudentPhoto, dele
 import { downloadImagesAsZip } from '../utils/imageUtils';
 import Modal from './Modal';
 import CameraView from './CameraView';
-import { PlusIcon, DownloadIcon, CameraIcon, SpinnerIcon, TrashIcon, EyeIcon, CheckCircleIcon } from './icons';
+import { PlusIcon, DownloadIcon, CameraIcon, SpinnerIcon, TrashIcon, EyeIcon, CheckCircleIcon, SearchIcon } from './icons';
 
 interface StudentManagerProps {
   schoolClass: SchoolClass;
@@ -24,6 +24,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
   const [imageToView, setImageToView] = useState<string | null>(null);
   const [withNames, setWithNames] = useState(true);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadStudents = useCallback(async () => {
     setIsLoading(true);
@@ -136,14 +137,30 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
     }
   };
 
+  const filteredStudents = students.filter(student =>
+    student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 drop-shadow-lg">طلاب الشُعبة</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 bg-black/10 dark:bg-white/10 backdrop-blur-sm p-2 rounded-lg">
+        <h2 className="text-3xl font-bold text-gray-800 drop-shadow-lg">طلاب الشُعبة</h2>
+        <div className="flex items-center gap-2 flex-wrap justify-start sm:justify-end w-full sm:w-auto">
+            <div className="relative">
+                <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <SearchIcon className="w-5 h-5 text-gray-400" />
+                </span>
+                <input
+                    type="text"
+                    placeholder="ابحث عن طالب..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full sm:w-56 pr-10 pl-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+            </div>
+            <div className="flex items-center gap-2 bg-black/10 backdrop-blur-sm p-2 rounded-lg">
                 <input type="checkbox" id="withNames" checked={withNames} onChange={(e) => setWithNames(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"/>
-                <label htmlFor="withNames" className="text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer">تضمين الأسماء</label>
+                <label htmlFor="withNames" className="text-sm font-medium text-gray-800 cursor-pointer">تضمين الأسماء</label>
             </div>
             <button onClick={handleDownloadZip} disabled={isDownloadingZip || students.filter(s => s.photo_data_url).length === 0} className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:bg-gray-400">
                 {isDownloadingZip ? <SpinnerIcon className="w-5 h-5"/> : <DownloadIcon className="w-5 h-5" />}
@@ -162,37 +179,39 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
             <p className="mt-2 drop-shadow-sm">جاري تحميل الطلاب...</p>
         </div>
       ) : students.length === 0 ? (
-        <div className="text-center py-10 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm rounded-lg shadow">
-          <p className="text-lg text-gray-600 dark:text-gray-300">لم يتم إضافة أي طالب لهذه الشُعبة بعد.</p>
+        <div className="text-center py-10 bg-white/60 backdrop-blur-sm rounded-lg shadow">
+          <p className="text-lg text-gray-600">لم يتم إضافة أي طالب لهذه الشُعبة بعد.</p>
+        </div>
+      ) : filteredStudents.length === 0 ? (
+        <div className="text-center py-10 bg-white/60 backdrop-blur-sm rounded-lg shadow">
+          <p className="text-lg text-gray-600">لا يوجد طلاب يطابقون بحثك.</p>
         </div>
       ) : (
         <div className="space-y-3 fade-in">
-          {students.map((student) => (
-            <div key={student.id} className="flex items-center justify-between p-3 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-shadow">
+          {filteredStudents.map((student) => (
+            <div key={student.id} className="flex items-center justify-between p-3 bg-white/70 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center gap-4">
                   {student.photo_data_url ? (
-// FIX: Wrap icon in a span with a title attribute for tooltip functionality.
                       <span title="تم التصوير">
                         <CheckCircleIcon className="w-7 h-7 text-green-500"/>
                       </span>
                   ) : (
-// FIX: Wrap icon in a span with a title attribute for tooltip functionality.
                       <span title="لم يتم التصوير">
                         <CameraIcon className="w-7 h-7 text-gray-400"/>
                       </span>
                   )}
-                  <span className="font-semibold text-lg text-gray-800 dark:text-gray-200">{student.name}</span>
+                  <span className="font-semibold text-lg text-gray-800">{student.name}</span>
               </div>
               <div className="flex items-center gap-2">
                   {student.photo_data_url && (
                       <>
-                          <button onClick={() => handleDownloadSingleImage(student)} className="p-2 text-gray-600 hover:text-green-600 dark:text-gray-300 dark:hover:text-green-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="حفظ الصورة على الجهاز">
+                          <button onClick={() => handleDownloadSingleImage(student)} className="p-2 text-gray-600 hover:text-green-600 transition-colors rounded-full hover:bg-gray-200" title="حفظ الصورة على الجهاز">
                               <DownloadIcon className="w-5 h-5" />
                           </button>
-                          <button onClick={() => setImageToView(student.photo_data_url!)} className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="عرض الصورة">
+                          <button onClick={() => setImageToView(student.photo_data_url!)} className="p-2 text-gray-600 hover:text-blue-600 transition-colors rounded-full hover:bg-gray-200" title="عرض الصورة">
                               <EyeIcon className="w-5 h-5" />
                           </button>
-                          <button onClick={() => openDeletePhotoConfirm(student.id)} className="p-2 text-gray-600 hover:text-yellow-600 dark:text-gray-300 dark:hover:text-yellow-400 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="حذف الصورة فقط">
+                          <button onClick={() => openDeletePhotoConfirm(student.id)} className="p-2 text-gray-600 hover:text-yellow-600 transition-colors rounded-full hover:bg-gray-200" title="حذف الصورة فقط">
                               <TrashIcon className="w-5 h-5" />
                           </button>
                       </>
@@ -201,7 +220,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
                       <CameraIcon className="w-4 h-4" />
                       <span>{student.photo_data_url ? 'إعادة التصوير' : 'تصوير'}</span>
                   </button>
-                  <button onClick={() => openDeleteStudentModal(student)} className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-500 transition-colors rounded-full hover:bg-red-100 dark:hover:bg-red-900/50" title={`حذف الطالب ${student.name}`}>
+                  <button onClick={() => openDeleteStudentModal(student)} className="p-2 text-gray-600 hover:text-red-600 transition-colors rounded-full hover:bg-red-100" title={`حذف الطالب ${student.name}`}>
                       <TrashIcon className="w-5 h-5" />
                   </button>
               </div>
@@ -218,7 +237,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="إضافة طالب جديد" isLoading={isSaving}>
         <div className="space-y-4">
-          <input type="text" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} placeholder="اسم الطالب الكامل" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:border-gray-600" autoFocus />
+          <input type="text" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} placeholder="اسم الطالب الكامل" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" autoFocus />
           <button onClick={handleAddStudent} disabled={isSaving || !newStudentName.trim()} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 transition-colors">
             {isSaving && <SpinnerIcon className="w-5 h-5" />}
             <span>{isSaving ? 'جاري الحفظ...' : 'حفظ'}</span>
@@ -229,14 +248,14 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
        <Modal isOpen={!!studentToDelete} onClose={() => setStudentToDelete(null)} title="تأكيد حذف الطالب" isLoading={isDeleting}>
         {studentToDelete && (
             <div className="space-y-6">
-            <p className="text-lg text-gray-700 dark:text-gray-300">
-                هل أنت متأكد من حذف الطالب <span className="font-bold text-red-600 dark:text-red-400">{studentToDelete.name}</span>؟
+            <p className="text-lg text-gray-700">
+                هل أنت متأكد من حذف الطالب <span className="font-bold text-red-600">{studentToDelete.name}</span>؟
             </p>
-            <p className="font-semibold text-red-600 dark:text-red-400">
+            <p className="font-semibold text-red-600">
                 سيتم حذف الطالب وجميع بياناته بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
             </p>
             <div className="flex justify-end gap-4">
-                <button onClick={() => setStudentToDelete(null)} disabled={isDeleting} className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors disabled:opacity-50">إلغاء</button>
+                <button onClick={() => setStudentToDelete(null)} disabled={isDeleting} className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50">إلغاء</button>
                 <button onClick={handleConfirmDeleteStudent} disabled={isDeleting} className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[110px]">
                     {isDeleting && <SpinnerIcon className="w-5 h-5"/>}
                     <span>{isDeleting ? 'جاري الحذف...' : 'نعم، احذف'}</span>
@@ -248,9 +267,9 @@ const StudentManager: React.FC<StudentManagerProps> = ({ schoolClass }) => {
 
       <Modal isOpen={studentIdForPhotoDeleteConfirm !== null} onClose={() => setStudentIdForPhotoDeleteConfirm(null)} title="تأكيد حذف الصورة" isLoading={isDeletingPhoto}>
         <div className="space-y-6">
-            <p className="text-lg text-gray-700 dark:text-gray-300">هل أنت متأكد من حذف صورة هذا الطالب؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <p className="text-lg text-gray-700">هل أنت متأكد من حذف صورة هذا الطالب؟ لا يمكن التراجع عن هذا الإجراء.</p>
             <div className="flex justify-end gap-4">
-                <button onClick={() => setStudentIdForPhotoDeleteConfirm(null)} disabled={isDeletingPhoto} className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors disabled:opacity-50">إلغاء</button>
+                <button onClick={() => setStudentIdForPhotoDeleteConfirm(null)} disabled={isDeletingPhoto} className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50">إلغاء</button>
                 <button onClick={handleConfirmDeletePhoto} disabled={isDeletingPhoto} className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[110px]">
                     {isDeletingPhoto ? <SpinnerIcon className="w-5 h-5"/> : null}
                     <span>{isDeletingPhoto ? 'جاري الحذف...' : 'نعم، احذف'}</span>

@@ -76,7 +76,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 drop-shadow-lg">الشُعب الدراسية</h2>
+        <h2 className="text-3xl font-bold text-gray-800 drop-shadow-lg">الشُعب الدراسية</h2>
         <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg shadow-md hover:bg-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
@@ -92,19 +92,19 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
             <p className="mt-2 drop-shadow-sm">جاري تحميل الشُعب...</p>
         </div>
       ) : classes.length === 0 ? (
-        <div className="text-center py-10 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm rounded-lg shadow">
-          <p className="text-lg text-gray-600 dark:text-gray-300">لم يتم إضافة أي شُعبة بعد.</p>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">انقر على "إضافة شُعبة" للبدء.</p>
+        <div className="text-center py-10 bg-white/60 backdrop-blur-sm rounded-lg shadow">
+          <p className="text-lg text-gray-600">لم يتم إضافة أي شُعبة بعد.</p>
+          <p className="mt-2 text-sm text-gray-500">انقر على "إضافة شُعبة" للبدء.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {classes.map((c) => (
             <div
               key={c.id}
-              className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-xl hover:scale-105 hover:bg-white/80 dark:hover:bg-gray-900/80 transition-all duration-300 group"
+              className="relative bg-white/60 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-xl hover:scale-105 hover:bg-white/80 transition-all duration-300 group"
             >
               <div onClick={() => onClassSelect(c)} className="cursor-pointer p-6 flex items-center justify-center">
-                <h3 className="text-xl font-semibold text-center text-gray-700 dark:text-gray-200">{c.name}</h3>
+                <h3 className="text-xl font-semibold text-center text-gray-700">{c.name}</h3>
               </div>
               <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow pointer-events-none">
                   {c.studentCount} طالب
@@ -131,7 +131,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
             value={newClassName}
             onChange={(e) => setNewClassName(e.target.value)}
             placeholder="اسم الشُعبة (مثال: أول ابتدائي - أ)"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:border-gray-600"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
             autoFocus
           />
           <button
@@ -148,17 +148,17 @@ const ClassManager: React.FC<ClassManagerProps> = ({ onClassSelect }) => {
       <Modal isOpen={!!classToDelete} onClose={() => setClassToDelete(null)} title="تأكيد حذف الشُعبة" isLoading={isDeleting}>
         {classToDelete && (
             <div className="space-y-6">
-            <p className="text-lg text-gray-700 dark:text-gray-300">
-                هل أنت متأكد من حذف شُعبة <span className="font-bold text-red-600 dark:text-red-400">{classToDelete.name}</span>؟
+            <p className="text-lg text-gray-700">
+                هل أنت متأكد من حذف شُعبة <span className="font-bold text-red-600">{classToDelete.name}</span>؟
             </p>
-            <p className="font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 p-3 rounded-md">
+            <p className="font-semibold text-red-600 bg-red-100 p-3 rounded-md">
                 سيتم حذف جميع الطلاب المسجلين في هذه الشُعبة بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
             </p>
             <div className="flex justify-end gap-4">
                 <button 
                     onClick={() => setClassToDelete(null)}
                     disabled={isDeleting}
-                    className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+                    className="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
                 >
                     إلغاء
                 </button>

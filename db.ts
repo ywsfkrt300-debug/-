@@ -3,6 +3,21 @@ import type { SchoolClass, Student } from './types';
 // Helper functions for getting and setting data in localStorage
 const getClasses = (): SchoolClass[] => {
   try {
+    const classesStr = localStorage.getItem('sawwirni_classes');
+    // Only seed data if it's the very first time and the key doesn't exist.
+    if (classesStr === null) {
+      const defaultClasses: SchoolClass[] = [
+        { id: 0, name: 'التاسع / 1' },
+        { id: 0, name: 'التاسع / 2' },
+        { id: 0, name: 'التاسع / 3' },
+        { id: 0, name: 'التاسع / 4' },
+        { id: 0, name: 'التاسع / 5' },
+        { id: 0, name: 'التاسع / 6' },
+      ].map((c, i) => ({ ...c, id: Date.now() + i }));
+      
+      saveClasses(defaultClasses);
+      return defaultClasses;
+    }
     return JSON.parse(localStorage.getItem('sawwirni_classes') || '[]');
   } catch (e) {
     return [];

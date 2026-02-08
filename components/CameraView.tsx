@@ -165,8 +165,8 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
         {!finalImage && !originalImage && stream && (
           <div className="absolute inset-0 pointer-events-none">
             <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[34%] h-4/5 text-white/40" viewBox="0 0 300 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="2" y="2" width="296" height="396" rx="30" stroke="currentColor" strokeWidth="4" strokeDasharray="10 8"/>
-                <line x1="50" y1="150" x2="250" y2="150" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5"/>
+                <path d="M 20 400 L 20 300 C 20 250, 70 200, 90 170 C 60 120, 100 20, 150 20 C 200 20, 240 120, 210 170 C 230 200, 280 250, 280 300 L 280 400" stroke="currentColor" strokeWidth="4" strokeDasharray="10 8"/>
+                <line x1="80" y1="120" x2="220" y2="120" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5"/>
             </svg>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/4 h-1">
               <div className={`absolute w-full h-px top-1/2 ${isLevel ? 'bg-green-500/80' : 'bg-white/50'}`}></div>
