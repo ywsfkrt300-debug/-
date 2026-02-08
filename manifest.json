@@ -1,0 +1,28 @@
+{
+  "name": "تطبيق صوّرني",
+  "short_name": "صوّرني",
+  "description": "أداة ذكية للمدارس لتصوير الطلاب وإدارة صورهم بسهولة وكفاءة، مع تخزين محلي للبيانات.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9488",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://image2url.com/r2/default/images/1770324189688-19e18e06-e522-42b7-b936-30cf78ff88c2.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://image2url.com/r2/default/images/1770324189688-19e18e06-e522-42b7-b936-30cf78ff88c2.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "https://image2url.com/r2/default/images/1770324189688-19e18e06-e522-42b7-b936-30cf78ff88c2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
