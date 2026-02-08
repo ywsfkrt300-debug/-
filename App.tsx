@@ -1,16 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { SchoolClass } from './types';
 import ClassManager from './components/ClassManager';
 import StudentManager from './components/StudentManager';
 import Header from './components/Header';
-import { preloadBackgroundRemover } from './utils/backgroundRemover';
 
 const App: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<SchoolClass | null>(null);
-
-  useEffect(() => {
-    preloadBackgroundRemover();
-  }, []);
 
   const handleBackToClasses = () => {
     setSelectedClass(null);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Student } from '../types';
-import { SpinnerIcon, SwitchCameraIcon } from './icons';
+import { SpinnerIcon, SwitchCameraIcon, NoSymbolIcon } from './icons';
 import { removeBackgroundOffline } from '../utils/backgroundRemover';
 import CropModal from './CropModal';
 
@@ -10,13 +10,23 @@ interface CameraViewProps {
   onSave: (studentId: number, photoDataUrl: string) => Promise<void>;
 }
 
+const colorOptions: { name: string; value: string | null }[] = [
+  { name: 'Original', value: null },
+  { name: 'White', value: '#FFFFFF' },
+  { name: 'Light Gray', value: '#E5E7EB' },
+  { name: 'Light Blue', value: '#BFDBFE' },
+  { name: 'Dark Blue', value: '#1E40AF' },
+];
+
 const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shutterSoundRef = useRef<HTMLAudioElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null); // From camera, for cropping
+  const [imageForProcessing, setImageForProcessing] = useState<string | null>(null); // After cropping
+  const [finalImage, setFinalImage] = useState<string | null>(null); // Final result for display/save
+  const [backgroundColor, setBackgroundColor] = useState<string | null>('#FFFFFF');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,7 +59,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   }, [stream]);
   
   useEffect(() => {
-    shutterSoundRef.current = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAI V1RYWlhAAAAAAAASW5mbwAAAA8AAABBAAAAAAAAAABoamgAAAAAAP//uQxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AAMIghAABp4Q0AqGgAAABNjb250ZW50X3R5cGUAYmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbQBkYXRhX3NvdXJjZQBzcmVjb3JkZWQ6c291cmNlAG1ldGFkYXRhX2V4cG9ydF92ZXJzaW9uATESAAAAAAAAAAAA//uQxAADASEBCAFqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq-');
+    shutterSoundRef.current = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAIV1RYWlhAAAAAAAASW5mbwAAAA8AAABBAAAAAAAAAABoamgAAAAAAP//uQxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AAMIghAABp4Q0AqGgAAABNjb250ZW50X3R5cGUAYmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbQBkYXRhX3NvdXJjZQBzcmVjb3JkZWQ6c291cmNlAG1ldGFkYXRhX2V4cG9ydF92ZXJzaW9uATESAAAAAAAAAAAA//uQxAADASEBCAFqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq-');
     shutterSoundRef.current.volume = 0.6;
 
     startCamera(facingMode);
@@ -62,6 +72,38 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
       window.removeEventListener('deviceorientation', handleOrientation);
     };
   }, [facingMode]);
+
+  useEffect(() => {
+    if (!imageForProcessing) return;
+
+    const process = async () => {
+      setIsProcessing(true);
+      setProcessingFeedback(backgroundColor ? 'جاري تطبيق الخلفية...' : 'جاري تحميل الصورة الأصلية...');
+
+      try {
+        if (backgroundColor) {
+          const processedImage = await removeBackgroundOffline(imageForProcessing, backgroundColor);
+          setFinalImage(processedImage);
+        } else {
+          // User selected "Original" background
+          setFinalImage(imageForProcessing);
+        }
+      } catch (error) {
+        console.error("Error during background processing:", error);
+        setFinalImage(imageForProcessing); // Fallback to cropped image
+        setProcessingFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام الصورة المقصوصة.');
+      } finally {
+        setIsProcessing(false);
+        // Don't clear feedback immediately if there was an error
+        if (!processingFeedback?.includes('خطأ')) {
+            setProcessingFeedback(null);
+        }
+      }
+    };
+
+    process();
+
+  }, [imageForProcessing, backgroundColor]);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -82,34 +124,23 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
     }
   };
   
-  const processCroppedImage = async (croppedImageDataUrl: string) => {
+  const handleCropConfirm = async (croppedImageDataUrl: string) => {
     setOriginalImage(null);
-    setCapturedImage(croppedImageDataUrl);
-    setProcessingFeedback('جاري إزالة الخلفية...');
-    setIsProcessing(true);
-    try {
-      const processedImage = await removeBackgroundOffline(croppedImageDataUrl);
-      setCapturedImage(processedImage);
-      setProcessingFeedback(null);
-    } catch (error) {
-      console.error("Error during offline background removal:", error);
-      setCapturedImage(croppedImageDataUrl);
-      setProcessingFeedback('حدث خطأ أثناء المعالجة، سيتم استخدام الصورة الأصلية.');
-    } finally {
-      setIsProcessing(false);
-    }
+    setImageForProcessing(croppedImageDataUrl);
   };
 
   const handleRetake = () => {
     setOriginalImage(null);
-    setCapturedImage(null);
+    setImageForProcessing(null);
+    setFinalImage(null);
     setProcessingFeedback(null);
+    setBackgroundColor('#FFFFFF'); // Reset to default
   };
   
   const handleSave = async () => {
-    if (capturedImage) {
+    if (finalImage) {
       setIsSaving(true);
-      await onSave(student.id, capturedImage);
+      await onSave(student.id, finalImage);
       setIsSaving(false);
     }
   };
@@ -121,17 +152,17 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center items-center p-4">
       <div className="absolute top-4 right-4 text-white font-bold text-xl sm:text-2xl z-20">{student.name}</div>
       <div className="absolute top-12 right-4 text-white/80 text-sm sm:text-lg z-20 text-center max-w-[90vw]">
-        {!capturedImage && !originalImage && <p>ضع الوجه داخل الإطار وحاذِ العينين مع الخط الأفقي</p>}
+        {!finalImage && !originalImage && <p>ضع الوجه داخل الإطار وحاذِ العينين مع الخط الأفقي</p>}
         <p className={isLevel ? 'text-green-400' : 'text-yellow-400'}>{isLevel ? 'الجهاز مستقيم' : 'حافظ على استقامة الجهاز'}</p>
       </div>
 
       <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
         {error && <div className="absolute inset-0 flex items-center justify-center text-red-500 bg-gray-800 p-4 text-center">{error}</div>}
-        <video ref={videoRef} autoPlay playsInline className={`w-full h-full object-contain ${capturedImage || originalImage ? 'hidden' : 'block'}`} />
-        {capturedImage && <img src={capturedImage} alt="Captured" className="w-full h-full object-contain" />}
+        <video ref={videoRef} autoPlay playsInline className={`w-full h-full object-contain ${finalImage || originalImage ? 'hidden' : 'block'}`} />
+        {finalImage && <img src={finalImage} alt="Captured" className="w-full h-full object-contain" />}
         <canvas ref={canvasRef} className="hidden" />
 
-        {!capturedImage && !originalImage && stream && (
+        {!finalImage && !originalImage && stream && (
           <div className="absolute inset-0 pointer-events-none">
             <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[34%] h-4/5 text-white/40" viewBox="0 0 300 400" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="2" y="2" width="296" height="396" rx="30" stroke="currentColor" strokeWidth="4" strokeDasharray="10 8"/>
@@ -144,7 +175,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
           </div>
         )}
         
-        {!stream && !error && !capturedImage && (
+        {!stream && !error && !finalImage && (
           <div className="absolute inset-0 flex items-center justify-center text-white bg-gray-900">
             <SpinnerIcon className="w-10 h-10" /><span className="ml-4 text-lg">جاري تشغيل الكاميرا...</span>
           </div>
@@ -163,10 +194,30 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
         )}
       </div>
       
-      <div className="mt-4 flex flex-col items-center justify-center z-20 min-h-[6rem]">
-        <div className="flex flex-wrap justify-center items-center gap-4">
+      <div className="mt-4 flex flex-col items-center justify-center z-20">
+        {imageForProcessing && (
+            <div className="mb-4 text-center">
+                <p className="text-white mb-2 text-sm">اختر لون الخلفية</p>
+                <div className="flex justify-center items-center gap-3 p-2 bg-black/30 rounded-full">
+                {colorOptions.map((option) => (
+                    <button
+                        key={option.name}
+                        title={option.name}
+                        onClick={() => setBackgroundColor(option.value)}
+                        className={`w-10 h-10 rounded-full transition-transform duration-200 hover:scale-110 border-2 ${backgroundColor === option.value ? 'border-teal-400 scale-110' : 'border-transparent'}`}
+                        style={{ backgroundColor: option.value ?? '#4A5568' }}
+                    >
+                    {option.value === null && (
+                        <NoSymbolIcon className="w-8 h-8 mx-auto text-white/80" />
+                    )}
+                    </button>
+                ))}
+                </div>
+            </div>
+        )}
+        <div className="flex flex-wrap justify-center items-center gap-4 min-h-[4rem]">
           <button onClick={onClose} className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">إغلاق</button>
-          {!capturedImage && !originalImage ? (
+          {!imageForProcessing && !originalImage ? (
             <>
               <button onClick={handleToggleCamera} className="p-4 bg-gray-700 text-white rounded-full hover:bg-gray-600 transition disabled:bg-gray-500" title="تبديل الكاميرا" aria-label="تبديل الكاميرا"><SwitchCameraIcon className="w-6 h-6" /></button>
               <button onClick={handleCapture} disabled={!stream} className="px-6 sm:px-8 py-3 sm:py-4 bg-red-600 text-white rounded-full text-lg font-bold hover:bg-red-700 transition disabled:bg-gray-400 flex items-center justify-center min-w-[120px]">التقاط</button>
@@ -174,7 +225,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
           ) : !originalImage ? (
             <>
               <button onClick={handleRetake} disabled={isProcessing || isSaving} className="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition disabled:bg-gray-400">إعادة التصوير</button>
-              <button onClick={handleSave} disabled={isSaving || isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition disabled:bg-gray-400 flex items-center gap-2">
+              <button onClick={handleSave} disabled={isSaving || isProcessing || !finalImage} className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition disabled:bg-gray-400 flex items-center gap-2">
                 {isSaving && <SpinnerIcon className="w-5 h-5"/>}
                 {isSaving ? 'جاري الحفظ...' : 'حفظ الصورة'}
               </button>
@@ -183,7 +234,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
         </div>
       </div>
        {originalImage && (
-        <CropModal imageSrc={originalImage} onConfirm={processCroppedImage} onCancel={handleRetake} />
+        <CropModal imageSrc={originalImage} onConfirm={handleCropConfirm} onCancel={handleRetake} />
       )}
     </div>
   );

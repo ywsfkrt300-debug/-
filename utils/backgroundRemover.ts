@@ -2,55 +2,32 @@
 // We declare the global variable here to satisfy TypeScript.
 declare const SelfieSegmentation: any;
 
-let segmenter: any = null;
-
 /**
- * Gets the singleton instance of the SelfieSegmentation model.
- * Initializes it on the first call.
+ * Removes the background from an image data URL and replaces it with a solid color background.
+ * This function works entirely on the client-side, offline.
+ * It creates a new segmenter instance for each call to prevent state corruption from concurrent requests.
+ * @param imageDataUrl The base64 data URL of the image to process.
+ * @param backgroundColor The hex code of the color to use for the background.
+ * @returns A promise that resolves with the new image data URL with the specified background color.
  */
-const getSegmenter = () => {
-    // Singleton pattern: if segmenter is already initialized, return it.
-    if (!segmenter) {
-        segmenter = new SelfieSegmentation({
+export const removeBackgroundOffline = (imageDataUrl: string, backgroundColor: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        // Create a new instance for each operation to ensure isolation and prevent race conditions.
+        const segmenter = new SelfieSegmentation({
             locateFile: (file: string) => {
-                // Point to the CDN where the model files are located.
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
             }
         });
 
-        // Configure the segmenter for landscape images, which is common for cameras.
-        // modelSelection: 1 is optimized for landscape.
         segmenter.setOptions({
-            modelSelection: 1,
+            modelSelection: 1, // Optimized for landscape photos.
         });
-    }
-    return segmenter;
-};
-
-/**
- * Preloads the model and its dependencies by initializing the segmenter ahead of time.
- * Call this early in the app lifecycle to avoid delays during image processing.
- */
-export const preloadBackgroundRemover = () => {
-    getSegmenter();
-};
-
-
-/**
- * Removes the background from an image data URL and replaces it with a solid white background.
- * This function works entirely on the client-side, offline.
- * @param imageDataUrl The base64 data URL of the image to process.
- * @returns A promise that resolves with the new image data URL with a white background.
- */
-export const removeBackgroundOffline = (imageDataUrl: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        // Ensure the segmenter is initialized before use.
-        const currentSegmenter = getSegmenter();
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
         if (!ctx) {
+            segmenter.close(); // Clean up resources
             return reject(new Error('Could not get canvas context'));
         }
         
@@ -59,42 +36,34 @@ export const removeBackgroundOffline = (imageDataUrl: string): Promise<string> =
             canvas.width = image.width;
             canvas.height = image.height;
             
-            // Set up the callback for when the segmentation is complete.
-            currentSegmenter.onResults((results: any) => {
+            segmenter.onResults((results: any) => {
                 ctx.save();
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                // 1. Fill the entire canvas with a solid white background.
-                ctx.fillStyle = '#FFFFFF';
+                ctx.fillStyle = backgroundColor;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // 2. Draw the segmentation mask (the person) onto the canvas.
-                // This mask defines where the original image will be drawn.
-                ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-
-                // 3. Change the composite operation. 'source-in' means the new drawing
-                // will only be visible where it overlaps with the existing content (the mask).
                 ctx.globalCompositeOperation = 'source-in';
-                
-                // 4. Draw the original image. It will only appear where the mask was drawn.
+                ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
+                ctx.globalCompositeOperation = 'source-atop';
                 ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-                
-                // Restore the context to its original state.
                 ctx.restore();
                 
-                // Resolve the promise with the new image as a JPEG data URL.
+                // IMPORTANT: Close the segmenter to free up WebAssembly memory and resources.
+                segmenter.close();
                 resolve(canvas.toDataURL('image/jpeg', 0.9));
             });
             
             try {
-                // Send the image to the segmenter to start processing.
-                await currentSegmenter.send({ image: image });
+                await segmenter.send({ image: image });
             } catch (error) {
+                segmenter.close(); // Clean up on error
                 reject(error);
             }
         };
         
-        image.onerror = (err) => reject(err);
+        image.onerror = (err) => {
+            segmenter.close(); // Clean up on error
+            reject(err);
+        };
         image.src = imageDataUrl;
     });
 };
