@@ -4,11 +4,9 @@ import { BackArrowIcon } from './icons';
 interface HeaderProps {
   className?: string;
   onBack?: () => void;
-  onSignOut?: () => void;
-  userEmail?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ className, onBack, onSignOut, userEmail }) => {
+const Header: React.FC<HeaderProps> = ({ className, onBack }) => {
   return (
     <header className="bg-white/80 shadow-md sticky top-0 z-10 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,17 +22,6 @@ const Header: React.FC<HeaderProps> = ({ className, onBack, onSignOut, userEmail
             )}
           </div>
           <div className="flex items-center gap-4">
-            {userEmail && (
-                <div className="text-sm text-gray-600 flex items-center gap-3">
-                    <span className="hidden sm:inline">{userEmail}</span>
-                    <button
-                        onClick={onSignOut}
-                        className="px-3 py-1 border border-red-500 text-sm font-medium rounded-md text-red-500 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition"
-                    >
-                        تسجيل الخروج
-                    </button>
-                </div>
-            )}
             {onBack && (
               <button
                 onClick={onBack}
