@@ -1,13 +1,35 @@
-const CACHE_NAME = 'sawwirni-cache-v1';
+const CACHE_NAME = 'sawwirni-cache-v2'; // Increment cache version
+const URLS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/index.tsx',
+  '/App.tsx',
+  '/types.ts',
+  '/db.ts',
+  '/hooks/useTheme.ts',
+  '/utils/imageUtils.ts',
+  '/utils/backgroundRemover.ts',
+  '/components/icons.tsx',
+  '/components/Header.tsx',
+  '/components/Modal.tsx',
+  '/components/ClassManager.tsx',
+  '/components/StudentManager.tsx',
+  '/components/CameraView.tsx',
+  '/components/CropModal.tsx',
+  'https://image2url.com/r2/default/images/1770324189688-19e18e06-e522-42b7-b936-30cf78ff88c2.png',
+  'https://image2url.com/r2/default/images/1770536141788-2d571095-0891-4f3b-a07c-5eccee2d377a.jpg',
+];
 
-// On install, cache the app shell and other critical assets
+// On install, cache the app shell
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // We don't precache anything here, we'll cache on the fly
-      // This is a more robust approach for assets from various CDNs
-      return self.skipWaiting();
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Opened cache. Caching app shell...');
+        return cache.addAll(URLS_TO_CACHE);
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -17,39 +39,54 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames
-          .filter(name => name !== CACHE_NAME)
+          .filter(name => name.startsWith('sawwirni-cache-') && name !== CACHE_NAME)
           .map(name => caches.delete(name))
       );
-    }).then(() => self.clients.claim()) // Take control of open pages
+    }).then(() => self.clients.claim())
   );
 });
 
-// On fetch, use a "cache, falling back to network" strategy
+// On fetch, handle requests
 self.addEventListener('fetch', event => {
-  // We only want to cache GET requests
+  // We only cache GET requests
   if (event.request.method !== 'GET') {
     return;
   }
 
-  event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.match(event.request)
-        .then(cachedResponse => {
-          // A cached response is found, return it
-          if (cachedResponse) {
-            return cachedResponse;
-          }
+  // For navigation requests (e.g., loading the page), use network-first strategy.
+  // This ensures the user always gets the latest version of the app shell if they are online.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          // If the network fails, serve the main app page from the cache.
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
 
-          // No cached response, fetch from network
-          return fetch(event.request).then(networkResponse => {
-            // If the fetch is successful, clone it and store it in the cache
+  // For all other requests (assets, scripts, etc.), use a cache-first strategy.
+  // This makes the app load faster by serving assets from the cache.
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // If we have a cached response, return it.
+        if (response) {
+          return response;
+        }
+
+        // If not, fetch from the network.
+        return fetch(event.request).then(networkResponse => {
+          // And cache the new response for future use.
+          return caches.open(CACHE_NAME).then(cache => {
+            // Check if the response is valid before caching
             if (networkResponse && networkResponse.ok) {
-              const responseToCache = networkResponse.clone();
-              cache.put(event.request, responseToCache);
+              cache.put(event.request, networkResponse.clone());
             }
             return networkResponse;
           });
         });
-    })
+      })
   );
 });
