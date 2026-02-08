@@ -1,81 +1,78 @@
+// Since this is loaded via script tag in index.html, we declare it for TypeScript
+declare const SelfieSegmentation: any;
+
+let segmentation: any = null;
+
 /**
- * Helper function to convert data URL to Blob
- * @param dataurl The base64 data URL.
- * @returns A Blob object.
+ * Initializes the MediaPipe SelfieSegmentation model.
+ * This is called automatically by the processing function.
  */
-const dataURLtoBlob = (dataurl: string): Blob => {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) {
-        throw new Error('Invalid data URL');
-    }
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], {type:mime});
-}
+const initializeModel = async () => {
+    if (segmentation) return;
 
+    segmentation = new SelfieSegmentation({
+        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+    });
+
+    // Model 0 is faster, Model 1 is more accurate. For portraits, 1 is better.
+    segmentation.setOptions({
+        modelSelection: 1,
+    });
+
+    await segmentation.initialize();
+};
 
 /**
- * Removes the background from an image data URL using the remove.bg API.
- * This is an online operation and requires an internet connection.
+ * Replaces the background of an image with white using MediaPipe Selfie Segmentation.
+ * This is an offline operation that runs in the browser.
  * @param imageDataUrl The base64 data URL of the image to process.
- * @param backgroundColor The hex code of the color to use for the background.
- * @returns A promise that resolves with the new image data URL with the specified background color.
+ * @returns A promise that resolves with the new image data URL with a white background.
  */
-export const removeBackground = async (imageDataUrl: string, backgroundColor: string): Promise<string> => {
-    const apiKey = "eNkwhVq732chwvNB2Go5K329";
-    const apiUrl = "https://api.remove.bg/v1.0/removebg";
+export const replaceBackgroundWithWhite = async (imageDataUrl: string): Promise<string> => {
+    // Ensure the model is loaded before proceeding
+    await initializeModel();
 
-    try {
-        const imageBlob = dataURLtoBlob(imageDataUrl);
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.crossOrigin = "anonymous";
 
-        const formData = new FormData();
-        formData.append('image_file', imageBlob, 'student_photo.jpg');
-        formData.append('size', 'auto');
-        formData.append('format', 'json');
-        
-        // remove.bg uses transparent background if no color is specified.
-        if (backgroundColor) {
-            formData.append('bg_color', backgroundColor);
-        }
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'X-API-Key': apiKey,
-            },
-            body: formData,
-        });
-
-        if (!response.ok) {
-            // Try to parse error from remove.bg for better feedback
-            let errorMessage = `API request failed with status ${response.status}.`;
-            try {
-                const errorData = await response.json();
-                if (errorData.errors && errorData.errors.length > 0) {
-                    errorMessage = errorData.errors[0].title || errorMessage;
+        image.onload = () => {
+            // The onResults callback needs to be set before calling send()
+            segmentation.onResults((results: any) => {
+                if (!results.segmentationMask) {
+                    return reject(new Error('Failed to get segmentation mask.'));
                 }
-            } catch (e) {
-                // Could not parse JSON, use the status text.
-                errorMessage = `${errorMessage} ${response.statusText}`;
-            }
-            console.error('remove.bg API error:', errorMessage);
-            throw new Error(errorMessage);
-        }
 
-        const result = await response.json();
-        if (result.data && result.data.result_b64) {
-            return `data:image/png;base64,${result.data.result_b64}`;
-        } else {
-            throw new Error('Invalid response data from remove.bg API');
-        }
-    } catch (error) {
-        console.error("Error calling remove.bg API:", error);
-        throw error; // Re-throw to be handled by the calling component
-    }
+                // Temporary canvas to isolate the person
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = image.width;
+                tempCanvas.height = image.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                if (!tempCtx) return reject(new Error('Could not get temp canvas context.'));
+
+                tempCtx.drawImage(results.segmentationMask, 0, 0, tempCanvas.width, tempCanvas.height);
+                tempCtx.globalCompositeOperation = 'source-in';
+                tempCtx.drawImage(results.image, 0, 0, tempCanvas.width, tempCanvas.height);
+
+                // Final canvas to add the white background
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = image.width;
+                finalCanvas.height = image.height;
+                const finalCtx = finalCanvas.getContext('2d');
+                if (!finalCtx) return reject(new Error('Could not get final canvas context.'));
+
+                finalCtx.fillStyle = '#FFFFFF';
+                finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+                finalCtx.drawImage(tempCanvas, 0, 0);
+
+                resolve(finalCanvas.toDataURL('image/png'));
+            });
+
+            // Process the image
+            segmentation.send({ image });
+        };
+
+        image.onerror = (error) => reject(error);
+        image.src = imageDataUrl;
+    });
 };

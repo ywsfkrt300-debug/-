@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Student } from '../types';
-import { SpinnerIcon, SwitchCameraIcon, NoSymbolIcon } from './icons';
-import { removeBackground } from '../utils/backgroundRemover';
+import { SpinnerIcon, SwitchCameraIcon } from './icons';
+import { replaceBackgroundWithWhite } from '../utils/backgroundRemover';
 import CropModal from './CropModal';
 
 interface CameraViewProps {
@@ -9,14 +9,6 @@ interface CameraViewProps {
   onClose: () => void;
   onSave: (studentId: number, photoDataUrl: string) => Promise<void>;
 }
-
-const colorOptions: { name: string; value: string | null }[] = [
-  { name: 'Original', value: null },
-  { name: 'White', value: '#FFFFFF' },
-  { name: 'Light Gray', value: '#E5E7EB' },
-  { name: 'Light Blue', value: '#BFDBFE' },
-  { name: 'Dark Blue', value: '#1E40AF' },
-];
 
 const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -26,7 +18,6 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
   const [originalImage, setOriginalImage] = useState<string | null>(null); // From camera, for cropping
   const [imageForProcessing, setImageForProcessing] = useState<string | null>(null); // After cropping
   const [finalImage, setFinalImage] = useState<string | null>(null); // Final result for display/save
-  const [backgroundColor, setBackgroundColor] = useState<string | null>('#FFFFFF');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -78,22 +69,17 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
 
     const process = async () => {
       setIsProcessing(true);
-      setProcessingFeedback(backgroundColor ? 'جاري إزالة الخلفية عبر الإنترنت...' : 'جاري تحميل الصورة الأصلية...');
+      setProcessingFeedback('جاري معالجة الخلفية...');
       let hasError = false;
 
       try {
-        if (backgroundColor) {
-          const processedImage = await removeBackground(imageForProcessing, backgroundColor);
-          setFinalImage(processedImage);
-        } else {
-          // User selected "Original" background
-          setFinalImage(imageForProcessing);
-        }
+        const processedImage = await replaceBackgroundWithWhite(imageForProcessing);
+        setFinalImage(processedImage);
       } catch (error: any) {
         hasError = true;
         console.error("Error during background processing:", error);
         setFinalImage(imageForProcessing); // Fallback to cropped image
-        setProcessingFeedback(`فشل إزالة الخلفية: ${error.message}. سيتم استخدام الصورة المقصوصة.`);
+        setProcessingFeedback(`فشل معالجة الخلفية: ${error.message}. سيتم استخدام الصورة المقصوصة.`);
       } finally {
         setIsProcessing(false);
         if (!hasError) {
@@ -104,7 +90,7 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
 
     process();
 
-  }, [imageForProcessing, backgroundColor]);
+  }, [imageForProcessing]);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -135,7 +121,6 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
     setImageForProcessing(null);
     setFinalImage(null);
     setProcessingFeedback(null);
-    setBackgroundColor('#FFFFFF'); // Reset to default
   };
   
   const handleSave = async () => {
@@ -196,26 +181,6 @@ const CameraView: React.FC<CameraViewProps> = ({ student, onClose, onSave }) => 
       </div>
       
       <div className="mt-4 flex flex-col items-center justify-center z-20">
-        {imageForProcessing && (
-            <div className="mb-4 text-center">
-                <p className="text-white mb-2 text-sm">اختر لون الخلفية</p>
-                <div className="flex justify-center items-center gap-3 p-2 bg-black/30 rounded-full">
-                {colorOptions.map((option) => (
-                    <button
-                        key={option.name}
-                        title={option.name}
-                        onClick={() => setBackgroundColor(option.value)}
-                        className={`w-10 h-10 rounded-full transition-transform duration-200 hover:scale-110 border-2 ${backgroundColor === option.value ? 'border-teal-400 scale-110' : 'border-transparent'}`}
-                        style={{ backgroundColor: option.value ?? '#4A5568' }}
-                    >
-                    {option.value === null && (
-                        <NoSymbolIcon className="w-8 h-8 mx-auto text-white/80" />
-                    )}
-                    </button>
-                ))}
-                </div>
-            </div>
-        )}
         <div className="flex flex-wrap justify-center items-center gap-4 min-h-[4rem]">
           <button onClick={onClose} className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">إغلاق</button>
           {!imageForProcessing && !originalImage ? (
